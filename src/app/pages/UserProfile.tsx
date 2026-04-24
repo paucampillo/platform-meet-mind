@@ -32,14 +32,14 @@ import {
 
 export default function UserProfile() {
   const user = {
-    name: "MarÃ­a GarcÃ­a",
+    name: "María García",
     email: "maria.garcia@meetmind.com",
     phone: "+34 612 345 678",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
     role: "Product Manager",
-    team: "Producto & DiseÃ±o",
-    department: "TecnologÃ­a",
-    location: "Madrid, EspaÃ±a",
+    team: "Producto & Diseño",
+    department: "Tecnología",
+    location: "Madrid, España",
     status: "Activo",
     joinDate: "Enero 2024",
   };
@@ -47,7 +47,7 @@ export default function UserProfile() {
   const projects = [
     {
       id: 1,
-      name: "RediseÃ±o de Dashboard",
+      name: "Rediseño de Dashboard",
       status: "En progreso",
       progress: 75,
       team: 5,
@@ -58,7 +58,7 @@ export default function UserProfile() {
     },
     {
       id: 2,
-      name: "App MÃ³vil v2.0",
+      name: "App Móvil v2.0",
       status: "En progreso",
       progress: 45,
       team: 8,
@@ -69,8 +69,8 @@ export default function UserProfile() {
     },
     {
       id: 3,
-      name: "IntegraciÃ³n API Terceros",
-      status: "PlanificaciÃ³n",
+      name: "Integración API Terceros",
+      status: "Planificación",
       progress: 15,
       team: 4,
       deadline: "20 Abr 2026",
@@ -83,8 +83,8 @@ export default function UserProfile() {
   const tasks = [
     {
       id: 1,
-      title: "Revisar propuesta de diseÃ±o UX",
-      project: "RediseÃ±o de Dashboard",
+      title: "Revisar propuesta de diseño UX",
+      project: "Rediseño de Dashboard",
       dueDate: "2026-03-05",
       priority: "Alta",
       status: "pending",
@@ -93,25 +93,25 @@ export default function UserProfile() {
     {
       id: 2,
       title: "Definir roadmap Q2 2026",
-      project: "App MÃ³vil v2.0",
+      project: "App Móvil v2.0",
       dueDate: "2026-03-08",
       priority: "Alta",
       status: "in-progress",
-      assignedBy: "Laura MartÃ­nez",
+      assignedBy: "Laura Martínez",
     },
     {
       id: 3,
-      title: "Preparar presentaciÃ³n para stakeholders",
-      project: "RediseÃ±o de Dashboard",
+      title: "Preparar presentación para stakeholders",
+      project: "Rediseño de Dashboard",
       dueDate: "2026-03-10",
       priority: "Media",
       status: "pending",
-      assignedBy: "David LÃ³pez",
+      assignedBy: "David López",
     },
     {
       id: 4,
-      title: "Revisar documentaciÃ³n tÃ©cnica API",
-      project: "IntegraciÃ³n API Terceros",
+      title: "Revisar documentación técnica API",
+      project: "Integración API Terceros",
       dueDate: "2026-03-12",
       priority: "Media",
       status: "pending",
@@ -119,22 +119,22 @@ export default function UserProfile() {
     },
     {
       id: 5,
-      title: "AnÃ¡lisis de mÃ©tricas de usuario",
-      project: "App MÃ³vil v2.0",
+      title: "Análisis de métricas de usuario",
+      project: "App Móvil v2.0",
       dueDate: "2026-03-15",
       priority: "Baja",
       status: "pending",
-      assignedBy: "MarÃ­a GarcÃ­a",
+      assignedBy: "María García",
     },
   ];
 
   const upcomingEvents = [
     {
       id: 1,
-      title: "ReuniÃ³n de planificaciÃ³n Q1",
+      title: "Reunión de planificación Q1",
       date: "2026-03-05",
       time: "10:00 AM",
-      type: "ReuniÃ³n",
+      type: "Reunión",
       attendees: 6,
       location: "Sala de Conferencias A",
     },
@@ -143,7 +143,7 @@ export default function UserProfile() {
       title: "Demo de producto",
       date: "2026-03-07",
       time: "03:00 PM",
-      type: "PresentaciÃ³n",
+      type: "Presentación",
       attendees: 12,
       location: "Virtual",
     },
@@ -161,7 +161,7 @@ export default function UserProfile() {
       title: "Sprint Review",
       date: "2026-03-10",
       time: "04:00 PM",
-      type: "ReuniÃ³n",
+      type: "Reunión",
       attendees: 8,
       location: "Sala de Conferencias B",
     },
@@ -175,13 +175,13 @@ export default function UserProfile() {
       status: "online",
     },
     {
-      name: "Laura MartÃ­nez",
+      name: "Laura Martínez",
       role: "UX Designer",
       avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
       status: "online",
     },
     {
-      name: "David LÃ³pez",
+      name: "David López",
       role: "Backend Developer",
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
       status: "offline",
@@ -220,8 +220,8 @@ export default function UserProfile() {
 
   const achievements = [
     {
-      title: "LÃ­der de equipo",
-      description: "LiderÃ³ 5+ proyectos exitosos",
+      title: "Líder de equipo",
+      description: "Lideró 5+ proyectos exitosos",
       icon: Award,
       color: "text-yellow-600",
       bgColor: "bg-yellow-50",
@@ -259,7 +259,7 @@ export default function UserProfile() {
     switch (status) {
       case "En progreso":
         return "bg-blue-100 text-blue-800 border-0";
-      case "PlanificaciÃ³n":
+      case "Planificación":
         return "bg-purple-100 text-purple-800 border-0";
       case "Completado":
         return "bg-green-100 text-green-800 border-0";
@@ -330,7 +330,7 @@ export default function UserProfile() {
               <div className="flex items-center gap-2">
                 <Button variant="outline" className="gap-2">
                   <Settings className="w-4 h-4" />
-                  ConfiguraciÃ³n
+                  Configuración
                 </Button>
                 <Button variant="outline" className="gap-2">
                   <MessageSquare className="w-4 h-4" />
@@ -631,18 +631,18 @@ export default function UserProfile() {
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-2 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-900">
-                      Te uniste al proyecto <span className="font-medium">App MÃ³vil v2.0</span>
+                      Te uniste al proyecto <span className="font-medium">App Móvil v2.0</span>
                     </p>
-                    <p className="text-xs text-gray-600">Hace 1 dÃ­a</p>
+                    <p className="text-xs text-gray-600">Hace 1 día</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <div className="w-2 h-2 rounded-full bg-purple-500 mt-2 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-900">
-                      Asististe a <span className="font-medium">ReuniÃ³n de planificaciÃ³n</span>
+                      Asististe a <span className="font-medium">Reunión de planificación</span>
                     </p>
-                    <p className="text-xs text-gray-600">Hace 2 dÃ­as</p>
+                    <p className="text-xs text-gray-600">Hace 2 días</p>
                   </div>
                 </div>
               </CardContent>
@@ -653,3 +653,4 @@ export default function UserProfile() {
     </div>
   );
 }
+

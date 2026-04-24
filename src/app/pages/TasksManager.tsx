@@ -78,7 +78,7 @@ export default function TasksManager() {
   const [priorityFilter, setPriorityFilter] = useState("all-priority");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskProject, setNewTaskProject] = useState("RediseÃ±o de Dashboard");
+  const [newTaskProject, setNewTaskProject] = useState("Rediseño de Dashboard");
   const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
   const [newTaskStatus, setNewTaskStatus] = useState<"pending" | "in-progress" | "completed" | "blocked">("pending");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
@@ -117,7 +117,7 @@ export default function TasksManager() {
         transcript: `Lista de tareas del equipo:\n${taskList}`,
         format: "resumen",
         detailLevel: "Corto",
-        focusAreas: ["PriorizaciÃ³n", "Bloqueos", "Dependencias"],
+        focusAreas: ["Priorización", "Bloqueos", "Dependencias"],
       });
       if (json.success && json.data?.context) {
         setPrioritizeMsg(json.data.context);
@@ -350,9 +350,9 @@ export default function TasksManager() {
   };
 
   const templates = [
-    { id: 1, name: "Tarea de desarrollo", description: "Estructura para tareas de cÃ³digo" },
-    { id: 2, name: "Tarea de diseÃ±o", description: "Estructura para tareas de UI/UX" },
-    { id: 3, name: "RevisiÃ³n de cÃ³digo", description: "Checklist para code review" },
+    { id: 1, name: "Tarea de desarrollo", description: "Estructura para tareas de código" },
+    { id: 2, name: "Tarea de diseño", description: "Estructura para tareas de UI/UX" },
+    { id: 3, name: "Revisión de código", description: "Checklist para code review" },
     { id: 4, name: "Bug fix", description: "Template para resolver bugs" },
   ];
 
@@ -393,7 +393,7 @@ export default function TasksManager() {
                   <DialogHeader>
                     <DialogTitle>Plantillas de tareas</DialogTitle>
                     <DialogDescription>
-                      Selecciona una plantilla para crear una nueva tarea rÃ¡pidamente
+                      Selecciona una plantilla para crear una nueva tarea rápidamente
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid grid-cols-2 gap-3 mt-4">
@@ -544,10 +544,10 @@ export default function TasksManager() {
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-indigo-900 mb-1">RecomendaciÃ³n de IA</p>
+                <p className="text-sm font-semibold text-indigo-900 mb-1">Recomendación de IA</p>
                 <p className="text-sm text-indigo-800">{prioritizeMsg}</p>
               </div>
-              <button onClick={() => setPrioritizeMsg(null)} className="text-indigo-400 hover:text-indigo-600 text-lg leading-none">Ã—</button>
+              <button onClick={() => setPrioritizeMsg(null)} className="text-indigo-400 hover:text-indigo-600 text-lg leading-none">×</button>
             </div>
           )}
 
@@ -636,7 +636,7 @@ export default function TasksManager() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats.unassigned}</p>
-                    <p className="text-xs text-gray-600">Sin dueÃ±o</p>
+                    <p className="text-xs text-gray-600">Sin dueño</p>
                   </div>
                 </div>
               </CardContent>
@@ -738,7 +738,7 @@ export default function TasksManager() {
                 }`}
               >
                 <List className="w-4 h-4" />
-                <span className="text-sm font-medium">EstÃ¡ndar</span>
+                <span className="text-sm font-medium">Estándar</span>
               </button>
               <button
                 onClick={() => setViewMode("priority")}
@@ -810,7 +810,7 @@ export default function TasksManager() {
                               <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg mt-2 text-xs">
                                 <AlertCircle className="w-4 h-4 text-orange-600" />
                                 <span className="text-orange-800">
-                                  Bloqueada {task.blockedDays} dÃ­as. Considera:
+                                  Bloqueada {task.blockedDays} días. Considera:
                                 </span>
                                 <div className="flex items-center gap-1 ml-auto">
                                   <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
@@ -1100,7 +1100,7 @@ export default function TasksManager() {
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Tareas Bloqueadas</h3>
                   <p className="text-sm text-gray-600">
-                    Estas tareas estÃ¡n esperando que otras se completen
+                    Estas tareas están esperando que otras se completen
                   </p>
                 </div>
               </div>
@@ -1124,23 +1124,23 @@ export default function TasksManager() {
                 {filteredTasks.filter(t => t.blocked || (t.dependsOn && t.dependsOn.length > 0)).length === 0 && (
                   <div className="col-span-2 text-center py-12 text-gray-500">
                     <CheckCircle2 className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-                    <p className="font-medium">Â¡Excelente!</p>
+                    <p className="font-medium">¡Excelente!</p>
                     <p className="text-sm">No hay tareas bloqueadas</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Tareas crÃ­ticas - que bloquean a otras */}
+            {/* Tareas críticas - que bloquean a otras */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
                   <Network className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Tareas CrÃ­ticas</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Tareas Críticas</h3>
                   <p className="text-sm text-gray-600">
-                    Otras tareas dependen de estas - priorÃ­zalas
+                    Otras tareas dependen de estas - priorízalas
                   </p>
                 </div>
               </div>
@@ -1174,7 +1174,7 @@ export default function TasksManager() {
                 ).length === 0 && (
                   <div className="col-span-2 text-center py-12 text-gray-500">
                     <Network className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-                    <p className="text-sm">No hay tareas crÃ­ticas que bloqueen a otras</p>
+                    <p className="text-sm">No hay tareas críticas que bloqueen a otras</p>
                   </div>
                 )}
               </div>
@@ -1305,6 +1305,7 @@ export default function TasksManager() {
     </div>
   );
 }
+
 
 
 

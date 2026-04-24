@@ -50,10 +50,10 @@ export default function Notifications() {
       id: 1,
       type: "meeting",
       priority: "upcoming",
-      title: "ReuniÃ³n Sprint Marketing",
+      title: "Reunión Sprint Marketing",
       description: "Comienza en 30 min",
       assignee: {
-        name: "MarÃ­a GarcÃ­a",
+        name: "María García",
         avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
       },
       time: "10:30 AM",
@@ -64,10 +64,10 @@ export default function Notifications() {
       id: 2,
       type: "task",
       priority: "upcoming",
-      title: "DiseÃ±ar landing page",
-      description: "Vence maÃ±ana",
+      title: "Diseñar landing page",
+      description: "Vence mañana",
       assignee: {
-        name: "Laura MartÃ­nez",
+        name: "Laura Martínez",
         avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
       },
       dueDate: "6 Mar 2026",
@@ -79,7 +79,7 @@ export default function Notifications() {
       type: "task",
       priority: "overdue",
       title: "Informe mensual",
-      description: "Retrasado 2 dÃ­as",
+      description: "Retrasado 2 días",
       assignee: {
         name: "Carlos Ruiz",
         avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
@@ -93,7 +93,7 @@ export default function Notifications() {
       type: "project",
       priority: "completed",
       title: "Proyecto App Mobile actualizado",
-      description: "Ana Silva completÃ³ 3 tareas",
+      description: "Ana Silva completó 3 tareas",
       assignee: {
         name: "Ana Silva",
         avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
@@ -123,7 +123,7 @@ export default function Notifications() {
       title: "Revisar pull request",
       description: "Vence hoy a las 6:00 PM",
       assignee: {
-        name: "David LÃ³pez",
+        name: "David López",
         avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
       },
       dueDate: "5 Mar 2026",
@@ -134,8 +134,8 @@ export default function Notifications() {
       id: 7,
       type: "project",
       priority: "upcoming",
-      title: "RediseÃ±o de Dashboard",
-      description: "75% completado - milestone prÃ³ximo",
+      title: "Rediseño de Dashboard",
+      description: "75% completado - milestone próximo",
       time: "Hace 1h",
       icon: TrendingUp,
       read: true,
@@ -144,10 +144,10 @@ export default function Notifications() {
       id: 8,
       type: "task",
       priority: "overdue",
-      title: "Actualizar documentaciÃ³n",
-      description: "Retrasado 1 dÃ­a",
+      title: "Actualizar documentación",
+      description: "Retrasado 1 día",
       assignee: {
-        name: "Laura MartÃ­nez",
+        name: "Laura Martínez",
         avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
       },
       dueDate: "4 Mar 2026",
@@ -162,7 +162,7 @@ export default function Notifications() {
       type: "priority",
       icon: Sparkles,
       title: "3 tareas prioritarias hoy",
-      description: "DiseÃ±ar landing page, Revisar pull request, Testing componentes",
+      description: "Diseñar landing page, Revisar pull request, Testing componentes",
       color: "bg-indigo-50 border-indigo-200 text-indigo-900",
       iconColor: "text-indigo-600",
     },
@@ -170,8 +170,8 @@ export default function Notifications() {
       id: 2,
       type: "reminder",
       icon: Clock,
-      title: "ReuniÃ³n en 1h â€“ revisa tareas pendientes",
-      description: "Sprint Marketing: 2 action items sin resolver del Ãºltimo meeting",
+      title: "Reunión en 1h — revisa tareas pendientes",
+      description: "Sprint Marketing: 2 action items sin resolver del último meeting",
       color: "bg-blue-50 border-blue-200 text-blue-900",
       iconColor: "text-blue-600",
     },
@@ -179,8 +179,8 @@ export default function Notifications() {
       id: 3,
       type: "warning",
       icon: AlertTriangle,
-      title: "2 tareas podrÃ­an retrasarse",
-      description: "Informe mensual y DocumentaciÃ³n necesitan atenciÃ³n urgente",
+      title: "2 tareas podrían retrasarse",
+      description: "Informe mensual y Documentación necesitan atención urgente",
       color: "bg-orange-50 border-orange-200 text-orange-900",
       iconColor: "text-orange-600",
     },
@@ -229,7 +229,7 @@ export default function Notifications() {
       case "upcoming":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-            PrÃ³ximo
+            Próximo
           </Badge>
         );
       case "overdue":
@@ -283,7 +283,7 @@ export default function Notifications() {
                   Notificaciones Inteligentes
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Mantente al dÃ­a con tus tareas, reuniones y proyectos
+                  Mantente al día con tus tareas, reuniones y proyectos
                 </p>
               </div>
             </div>
@@ -297,7 +297,7 @@ export default function Notifications() {
               }
             >
               <Check className="w-4 h-4 mr-2" />
-              Marcar todas como leÃ­das
+              Marcar todas como leídas
             </Button>
           </div>
 
@@ -349,7 +349,7 @@ export default function Notifications() {
                 <CardContent className="p-12 text-center">
                   <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">
-                    No hay notificaciones en esta categorÃ­a
+                    No hay notificaciones en esta categoría
                   </p>
                 </CardContent>
               </Card>
@@ -472,7 +472,7 @@ export default function Notifications() {
                                 }
                               >
                                 <Check className="w-3.5 h-3.5" />
-                                Marcar como leÃ­da
+                                Marcar como leída
                               </Button>
                             )}
                             <Button
@@ -559,4 +559,5 @@ export default function Notifications() {
     </div>
   );
 }
+
 

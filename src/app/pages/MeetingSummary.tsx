@@ -30,12 +30,12 @@ import { postApiJson } from "../lib/apiClient";
 export default function MeetingSummary() {
   const [selectedFormat, setSelectedFormat] = useState<"resumen" | "esquema" | "mapa">("resumen");
   const [detailLevel, setDetailLevel] = useState("Medio");
-  const [selectedFocus, setSelectedFocus] = useState<string[]>(["VisiÃ³n general"]);
+  const [selectedFocus, setSelectedFocus] = useState<string[]>(["Visión general"]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasContent, setHasContent] = useState(true);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [transcriptText, setTranscriptText] = useState("Ana MartÃ­nez [00:12:34]: Para el prÃ³ximo trimestre, necesitamos migrar a una arquitectura de microservicios antes de junio.\n\nCarlos LÃ³pez [00:13:15]: Puedo encargarme de la documentaciÃ³n tÃ©cnica y preparar el plan de migraciÃ³n.\n\nMarÃ­a Torres [00:14:02]: Propongo organizar sesiones de capacitaciÃ³n en la nueva arquitectura.\n\nDavid Ruiz [00:17:30]: Necesitamos aprobar el incremento presupuestario para infraestructura cloud.");
+  const [transcriptText, setTranscriptText] = useState("Ana Martínez [00:12:34]: Para el próximo trimestre, necesitamos migrar a una arquitectura de microservicios antes de junio.\n\nCarlos López [00:13:15]: Puedo encargarme de la documentación técnica y preparar el plan de migración.\n\nMaría Torres [00:14:02]: Propongo organizar sesiones de capacitación en la nueva arquitectura.\n\nDavid Ruiz [00:17:30]: Necesitamos aprobar el incremento presupuestario para infraestructura cloud.");
 
   const formats = [
     {
@@ -48,7 +48,7 @@ export default function MeetingSummary() {
       id: "esquema" as const,
       icon: List,
       title: "Esquema",
-      description: "Estructura jerÃ¡rquica",
+      description: "Estructura jerárquica",
     },
     {
       id: "mapa" as const,
@@ -58,7 +58,7 @@ export default function MeetingSummary() {
     },
   ];
 
-  const focusOptions = ["VisiÃ³n general", "Temas tratados", "Decisiones", "Acciones"];
+  const focusOptions = ["Visión general", "Temas tratados", "Decisiones", "Acciones"];
 
   const toggleFocus = (focus: string) => {
     setSelectedFocus((prev) =>
@@ -91,21 +91,21 @@ export default function MeetingSummary() {
 
   const summaryData = {
     keyPoints: [
-      "MigraciÃ³n a microservicios aprobada para mejorar escalabilidad",
-      "ImplementaciÃ³n de autenticaciÃ³n multi-factor como prioridad alta",
-      "Lanzamiento de versiÃ³n beta pÃºblica programado para abril 2026",
+      "Migración a microservicios aprobada para mejorar escalabilidad",
+      "Implementación de autenticación multi-factor como prioridad alta",
+      "Lanzamiento de versión beta pública programado para abril 2026",
       "Presupuesto adicional aprobado para infraestructura cloud",
     ],
     topics: [
-      "Arquitectura tÃ©cnica",
+      "Arquitectura técnica",
       "Seguridad",
       "Roadmap de producto",
       "Recursos y presupuesto",
     ],
     decisions: [
       { decision: "Migrar a microservicios", owner: "Carlos Ruiz", date: "Q2 2026" },
-      { decision: "Implementar MFA", owner: "Laura MartÃ­nez", date: "Marzo 2026" },
-      { decision: "Lanzar beta pÃºblica", owner: "MarÃ­a GarcÃ­a", date: "Abril 2026" },
+      { decision: "Implementar MFA", owner: "Laura Martínez", date: "Marzo 2026" },
+      { decision: "Lanzar beta pública", owner: "María García", date: "Abril 2026" },
     ],
   };
 
@@ -115,11 +115,11 @@ export default function MeetingSummary() {
       level: 0,
       children: [
         {
-          title: "1.1 SituaciÃ³n actual",
+          title: "1.1 Situación actual",
           level: 1,
           content: [
             "La plataforma actual tiene limitaciones de escalabilidad",
-            "Se proyecta un crecimiento de 100k usuarios simultÃ¡neos",
+            "Se proyecta un crecimiento de 100k usuarios simultáneos",
           ],
         },
         {
@@ -128,37 +128,37 @@ export default function MeetingSummary() {
           content: [
             "Mejorar la infraestructura para soportar crecimiento",
             "Aumentar la seguridad con MFA",
-            "Preparar lanzamiento de beta pÃºblica",
+            "Preparar lanzamiento de beta pública",
           ],
         },
       ],
     },
     {
-      title: "2. Decisiones tÃ©cnicas",
+      title: "2. Decisiones técnicas",
       level: 0,
       children: [
         {
           title: "2.1 Arquitectura",
           level: 1,
           content: [
-            "MigraciÃ³n completa a microservicios",
-            "ImplementaciÃ³n en fases durante Q2",
-            "EvaluaciÃ³n de proveedores cloud",
+            "Migración completa a microservicios",
+            "Implementación en fases durante Q2",
+            "Evaluación de proveedores cloud",
           ],
         },
         {
           title: "2.2 Seguridad",
           level: 1,
           content: [
-            "AutenticaciÃ³n multi-factor obligatoria",
-            "AuditorÃ­a de seguridad externa",
-            "Cumplimiento con estÃ¡ndares SOC 2",
+            "Autenticación multi-factor obligatoria",
+            "Auditoría de seguridad externa",
+            "Cumplimiento con estándares SOC 2",
           ],
         },
       ],
     },
     {
-      title: "3. Plan de acciÃ³n",
+      title: "3. Plan de acción",
       level: 0,
       children: [
         {
@@ -167,7 +167,7 @@ export default function MeetingSummary() {
           content: [
             "Crear documento de arquitectura detallado",
             "Asignar recursos al equipo de seguridad",
-            "Programar reuniÃ³n de seguimiento en 2 semanas",
+            "Programar reunión de seguimiento en 2 semanas",
           ],
         },
       ],
@@ -186,7 +186,7 @@ export default function MeetingSummary() {
     {
       id: "2",
       title: "Microservicios",
-      description: "SoluciÃ³n tÃ©cnica",
+      description: "Solución técnica",
       type: "decision" as const,
       x: 350,
       y: 100,
@@ -194,7 +194,7 @@ export default function MeetingSummary() {
     {
       id: "3",
       title: "Seguridad",
-      description: "Requerimiento crÃ­tico",
+      description: "Requerimiento crítico",
       type: "concept" as const,
       x: 100,
       y: 250,
@@ -202,14 +202,14 @@ export default function MeetingSummary() {
     {
       id: "4",
       title: "Implementar MFA",
-      description: "AcciÃ³n prioritaria",
+      description: "Acción prioritaria",
       type: "action" as const,
       x: 350,
       y: 250,
     },
     {
       id: "5",
-      title: "Beta pÃºblica",
+      title: "Beta pública",
       description: "Objetivo Q1",
       type: "decision" as const,
       x: 600,
@@ -238,12 +238,12 @@ export default function MeetingSummary() {
       case "resumen": {
         const ai = generatedContent;
         const keyPoints: string[] = ai?.keyPoints?.map((p: any) => typeof p === "string" ? p : p.text) || summaryData.keyPoints;
-        const decisions: any[] = ai?.decisions?.map((d: string, i: number) => ({ decision: d, owner: "â€”", date: "â€”" })) || summaryData.decisions;
+        const decisions: any[] = ai?.decisions?.map((d: string, i: number) => ({ decision: d, owner: "—", date: "—" })) || summaryData.decisions;
         return (
           <div className="space-y-8">
             {ai && (
               <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <span className="text-xs text-green-700 font-medium">âœ“ Generado por Claude AI desde tu transcripciÃ³n</span>
+                <span className="text-xs text-green-700 font-medium">✓ Generado por Claude AI desde tu transcripción</span>
               </div>
             )}
             {ai?.context && (
@@ -275,7 +275,7 @@ export default function MeetingSummary() {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">DecisiÃ³n</th>
+                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Decisión</th>
                         <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Responsable</th>
                         <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Fecha</th>
                       </tr>
@@ -284,8 +284,8 @@ export default function MeetingSummary() {
                       {decisions.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-gray-900">{typeof item === "string" ? item : item.decision}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{item.owner || "â€”"}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.date || "â€”"}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{item.owner || "—"}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{item.date || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -436,7 +436,7 @@ export default function MeetingSummary() {
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Reuniones</span>
               <ChevronRight className="w-4 h-4" />
-              <span>ReuniÃ³n de planificaciÃ³n Q1 2026</span>
+              <span>Reunión de planificación Q1 2026</span>
               <ChevronRight className="w-4 h-4" />
               <span className="text-gray-900 font-medium">Resumen</span>
             </div>
@@ -508,10 +508,10 @@ export default function MeetingSummary() {
 
               {/* Transcript input */}
               <div>
-                <label className="text-xs font-semibold text-gray-700 block mb-1">TranscripciÃ³n</label>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Transcripción</label>
                 <textarea
                   className="w-full h-28 text-xs p-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white font-mono"
-                  placeholder="Pega aquÃ­ la transcripciÃ³n de tu reuniÃ³n..."
+                  placeholder="Pega aquí la transcripción de tu reunión..."
                   value={transcriptText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTranscriptText(e.target.value)}
                 />
@@ -543,7 +543,7 @@ export default function MeetingSummary() {
               </Button>
 
               <p className="text-xs text-gray-500">
-                Basado en la transcripciÃ³n de la reuniÃ³n
+                Basado en la transcripción de la reunión
               </p>
             </div>
           </aside>
@@ -560,7 +560,7 @@ export default function MeetingSummary() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-purple-900">
-                        <strong>PersonalizaciÃ³n:</strong> ajusta detalle y enfoque â€” exporta con un
+                        <strong>Personalización:</strong> ajusta detalle y enfoque — exporta con un
                         clic
                       </p>
                     </div>
@@ -596,5 +596,6 @@ export default function MeetingSummary() {
     </div>
   );
 }
+
 
 

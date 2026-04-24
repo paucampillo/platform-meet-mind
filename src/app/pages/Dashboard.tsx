@@ -38,7 +38,7 @@ export default function Dashboard() {
   const projects = [
     {
       id: 1,
-      name: "RediseÃ±o de Dashboard",
+      name: "Rediseño de Dashboard",
       status: "En progreso",
       progress: 75,
       team: 5,
@@ -49,7 +49,7 @@ export default function Dashboard() {
     },
     {
       id: 2,
-      name: "App MÃ³vil v2.0",
+      name: "App Móvil v2.0",
       status: "En progreso",
       progress: 45,
       team: 8,
@@ -60,8 +60,8 @@ export default function Dashboard() {
     },
     {
       id: 3,
-      name: "IntegraciÃ³n API Terceros",
-      status: "PlanificaciÃ³n",
+      name: "Integración API Terceros",
+      status: "Planificación",
       progress: 15,
       team: 4,
       deadline: "20 Abr 2026",
@@ -74,24 +74,24 @@ export default function Dashboard() {
   const meetings = [
     {
       id: "1",
-      title: "ReuniÃ³n de planificaciÃ³n Q1 2026",
+      title: "Reunión de planificación Q1 2026",
       date: new Date(2026, 1, 24),
       duration: 45,
       tasksCount: 8,
       decisionsCount: 5,
       status: "executing" as const,
-      project: "RediseÃ±o de Dashboard",
+      project: "Rediseño de Dashboard",
       type: "Planning",
     },
     {
       id: "2",
-      title: "SesiÃ³n de estrategia de producto",
+      title: "Sesión de estrategia de producto",
       date: new Date(2026, 1, 23),
       duration: 60,
       tasksCount: 12,
       decisionsCount: 7,
       status: "completed" as const,
-      project: "App MÃ³vil v2.0",
+      project: "App Móvil v2.0",
       type: "Strategy",
     },
     {
@@ -109,12 +109,12 @@ export default function Dashboard() {
   const activeTasks = [
     {
       id: "t1",
-      title: "Finalizar diseÃ±o de la nueva landing page",
-      assignee: { name: "MarÃ­a GarcÃ­a", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" },
+      title: "Finalizar diseño de la nueva landing page",
+      assignee: { name: "María García", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" },
       dueDate: new Date(2026, 1, 28),
       priority: "high" as const,
       completed: false,
-      project: "RediseÃ±o de Dashboard",
+      project: "Rediseño de Dashboard",
       blocked: false,
     },
     {
@@ -124,27 +124,27 @@ export default function Dashboard() {
       dueDate: new Date(2026, 1, 27),
       priority: "high" as const,
       completed: false,
-      project: "App MÃ³vil v2.0",
+      project: "App Móvil v2.0",
       blocked: true,
     },
     {
       id: "t3",
-      title: "Documentar API endpoints versiÃ³n 2.0",
-      assignee: { name: "Laura MartÃ­nez", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" },
+      title: "Documentar API endpoints versión 2.0",
+      assignee: { name: "Laura Martínez", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" },
       dueDate: new Date(2026, 2, 2),
       priority: "medium" as const,
       completed: false,
-      project: "IntegraciÃ³n API Terceros",
+      project: "Integración API Terceros",
       blocked: false,
     },
     {
       id: "t4",
-      title: "Configurar pipeline de CI/CD en producciÃ³n",
-      assignee: { name: "David LÃ³pez", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop" },
+      title: "Configurar pipeline de CI/CD en producción",
+      assignee: { name: "David López", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop" },
       dueDate: new Date(2026, 2, 5),
       priority: "medium" as const,
       completed: false,
-      project: "RediseÃ±o de Dashboard",
+      project: "Rediseño de Dashboard",
       blocked: false,
     },
     {
@@ -154,7 +154,7 @@ export default function Dashboard() {
       dueDate: new Date(2026, 2, 8),
       priority: "low" as const,
       completed: true,
-      project: "App MÃ³vil v2.0",
+      project: "App Móvil v2.0",
       blocked: false,
     },
   ];
@@ -167,13 +167,13 @@ export default function Dashboard() {
       status: "online",
     },
     {
-      name: "Laura MartÃ­nez",
+      name: "Laura Martínez",
       role: "UX Designer",
       avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
       status: "online",
     },
     {
-      name: "David LÃ³pez",
+      name: "David López",
       role: "Backend Developer",
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
       status: "offline",
@@ -189,11 +189,11 @@ export default function Dashboard() {
   const upcomingEvents = [
     {
       id: "e1",
-      title: "RevisiÃ³n de diseÃ±o UI/UX",
+      title: "Revisión de diseño UI/UX",
       date: new Date(2026, 1, 28),
       time: "10:00",
       duration: 2,
-      source: "ReuniÃ³n de planificaciÃ³n Q1",
+      source: "Reunión de planificación Q1",
     },
     {
       id: "e2",
@@ -201,7 +201,7 @@ export default function Dashboard() {
       date: new Date(2026, 2, 1),
       time: "14:00",
       duration: 1.5,
-      source: "SesiÃ³n de estrategia de producto",
+      source: "Sesión de estrategia de producto",
     },
     {
       id: "e3",
@@ -230,7 +230,7 @@ export default function Dashboard() {
     switch (status) {
       case "En progreso":
         return "bg-blue-100 text-blue-800 border-0";
-      case "PlanificaciÃ³n":
+      case "Planificación":
         return "bg-purple-100 text-purple-800 border-0";
       case "Completado":
         return "bg-green-100 text-green-800 border-0";
@@ -247,9 +247,9 @@ export default function Dashboard() {
         {/* Context Selectors */}
         <div className="mb-8 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 font-medium">Mi Ã¡mbito:</span>
+            <span className="text-sm text-gray-600 font-medium">Mi ámbito:</span>
             <div className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900">
-              TecnologÃ­a
+              Tecnología
             </div>
           </div>
           
@@ -292,14 +292,14 @@ export default function Dashboard() {
         {/* Hero Section */}
         <div className="mb-12 text-center max-w-3xl mx-auto">
           <h1 className="text-5xl font-bold mb-4 text-gray-900">
-            De la conversaciÃ³n a la acciÃ³n.
+            De la conversación a la acción.
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Tus reuniones convertidas en decisiones, tareas y agenda automÃ¡ticamente.
+            Tus reuniones convertidas en decisiones, tareas y agenda automáticamente.
           </p>
           <Button size="lg" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-lg px-8 py-6">
             <Sparkles className="w-5 h-5" />
-            Iniciar nueva sesiÃ³n
+            Iniciar nueva sesión
             <ArrowRight className="w-5 h-5" />
           </Button>
         </div>
@@ -349,7 +349,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">2</p>
-                <p className="text-xs text-gray-600">Vacantes sin dueÃ±o</p>
+                <p className="text-xs text-gray-600">Vacantes sin dueño</p>
               </div>
             </CardContent>
           </Card>
@@ -489,7 +489,7 @@ export default function Dashboard() {
             {/* Upcoming Auto-Generated Events */}
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <h2 className="text-2xl font-semibold text-gray-900">PrÃ³ximos eventos</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">Próximos eventos</h2>
               </div>
               <div className="space-y-3">
                 {upcomingEvents.map((event) => (
@@ -544,3 +544,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

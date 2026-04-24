@@ -33,18 +33,18 @@ export default function ProjectManager() {
 
   const project = {
     id: 1,
-    name: "RediseÃ±o de Dashboard",
-    description: "ModernizaciÃ³n completa de la interfaz del dashboard principal con nuevo sistema de diseÃ±o y mejoras de UX",
+    name: "Rediseño de Dashboard",
+    description: "Modernización completa de la interfaz del dashboard principal con nuevo sistema de diseño y mejoras de UX",
     status: "En progreso",
     progress: 75,
     priority: "Alta",
     startDate: "1 Feb 2026",
     deadline: "15 Mar 2026",
-    budget: "â‚¬45,000",
-    spent: "â‚¬33,750",
+    budget: "€45,000",
+    spent: "€33,750",
     team: [
       {
-        name: "MarÃ­a GarcÃ­a",
+        name: "María García",
         role: "Product Manager",
         avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
         status: "online"
@@ -56,13 +56,13 @@ export default function ProjectManager() {
         status: "online"
       },
       {
-        name: "Laura MartÃ­nez",
+        name: "Laura Martínez",
         role: "UX Designer",
         avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
         status: "online"
       },
       {
-        name: "David LÃ³pez",
+        name: "David López",
         role: "Backend Developer",
         avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
         status: "offline"
@@ -85,8 +85,8 @@ export default function ProjectManager() {
   const tasks = [
     {
       id: 1,
-      title: "DiseÃ±ar sistema de componentes",
-      assignee: "Laura MartÃ­nez",
+      title: "Diseñar sistema de componentes",
+      assignee: "Laura Martínez",
       avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
       status: "completed",
       priority: "Alta",
@@ -104,7 +104,7 @@ export default function ProjectManager() {
     {
       id: 3,
       title: "Refactorizar API de datos",
-      assignee: "David LÃ³pez",
+      assignee: "David López",
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
       status: "in-progress",
       priority: "Media",
@@ -132,7 +132,7 @@ export default function ProjectManager() {
     },
     {
       id: 2,
-      title: "Review de diseÃ±o UI/UX",
+      title: "Review de diseño UI/UX",
       date: "2026-02-15",
       duration: 45,
       attendees: 4,
@@ -391,9 +391,9 @@ export default function ProjectManager() {
                         <p className="font-medium text-sm text-gray-900">{meeting.title}</p>
                         <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
                           <span>{new Date(meeting.date).toLocaleDateString('es-ES')}</span>
-                          <span>â€¢</span>
+                          <span>·</span>
                           <span>{meeting.duration} min</span>
-                          <span>â€¢</span>
+                          <span>·</span>
                           <span>{meeting.attendees} asistentes</span>
                         </div>
                       </div>
@@ -512,3 +512,4 @@ export default function ProjectManager() {
     </div>
   );
 }
+
