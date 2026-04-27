@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Brain,
   CalendarRange,
   CheckSquare,
+  Play,
+  Square,
   Network,
   Sparkles,
 } from "lucide-react";
@@ -57,6 +59,23 @@ const THEME_RULES: Array<{ theme: string; keywords: string[] }> = [
   },
 ];
 
+const FLOW_THEME_COLORS = [
+  { fill: "#dbeafe", stroke: "#2563eb", text: "#1e3a8a" },
+  { fill: "#dcfce7", stroke: "#16a34a", text: "#166534" },
+  { fill: "#fef3c7", stroke: "#d97706", text: "#92400e" },
+  { fill: "#fce7f3", stroke: "#db2777", text: "#9d174d" },
+  { fill: "#ede9fe", stroke: "#7c3aed", text: "#5b21b6" },
+];
+
+const FLOW_OWNER_COLORS = [
+  { fill: "#f1f5f9", stroke: "#334155", text: "#0f172a" },
+  { fill: "#e0f2fe", stroke: "#0369a1", text: "#0c4a6e" },
+  { fill: "#ecfccb", stroke: "#65a30d", text: "#365314" },
+  { fill: "#ffedd5", stroke: "#ea580c", text: "#9a3412" },
+  { fill: "#ede9fe", stroke: "#6d28d9", text: "#4c1d95" },
+  { fill: "#ffe4e6", stroke: "#e11d48", text: "#881337" },
+];
+
 const hashString = (input: string) => {
   let hash = 0;
   for (let index = 0; index < input.length; index += 1) {
@@ -97,6 +116,32 @@ const addDays = (date: Date, days: number) => {
   return next;
 };
 
+const GANTT_CRITICAL_KEYWORDS = [
+  "bloque",
+  "riesgo",
+  "seguridad",
+  "presupuesto",
+  "aprobar",
+  "deadline",
+  "urgente",
+];
+
+const GANTT_DONE_KEYWORDS = ["complet", "terminad", "cerrad", "finaliz"];
+
+const getGanttTaskTags = (description: string, taskIndex: number) => {
+  const normalized = (description || "").toLowerCase();
+  if (GANTT_CRITICAL_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return ["crit"];
+  }
+  if (GANTT_DONE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return ["done"];
+  }
+  if (taskIndex === 0) {
+    return ["active"];
+  }
+  return [];
+};
+
 const ensureHorizontalFlow = (mermaidCode: string) => {
   const cleaned = String(mermaidCode || "").trim();
   if (!cleaned) return "";
@@ -119,6 +164,8 @@ const buildCrossDependencyFlow = (
   }
 
   const lines: string[] = ["flowchart LR", 'NSTART["Inicio"]', 'NEND["Cierre"]'];
+  lines.push("style NSTART fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#134e4a");
+  lines.push("style NEND fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d");
 
   const themeOrder: string[] = [];
   const themeTaskIds = new Map<string, string[]>();
@@ -151,6 +198,10 @@ const buildCrossDependencyFlow = (
     themeNodeIdByName.set(theme, themeNodeId);
     lines.push(`${themeNodeId}["${sanitizeMermaidLabel(theme)}"]`);
     lines.push(`NSTART --> ${themeNodeId}`);
+    const themeColor = FLOW_THEME_COLORS[index % FLOW_THEME_COLORS.length];
+    lines.push(
+      `style ${themeNodeId} fill:${themeColor.fill},stroke:${themeColor.stroke},stroke-width:2px,color:${themeColor.text}`,
+    );
   });
 
   taskRecords.forEach((task) => {
@@ -159,6 +210,12 @@ const buildCrossDependencyFlow = (
     if (themeNodeId) {
       lines.push(`${themeNodeId} --> ${task.id}`);
     }
+    const ownerColor = FLOW_OWNER_COLORS[
+      hashString(task.user) % FLOW_OWNER_COLORS.length
+    ];
+    lines.push(
+      `style ${task.id} fill:${ownerColor.fill},stroke:${ownerColor.stroke},stroke-width:2px,color:${ownerColor.text}`,
+    );
   });
 
   // Sequential flow inside each theme.
@@ -238,19 +295,21 @@ const buildUserGantt = (tasks: MeetingTask[]) => {
 
   for (const [user, userTasks] of grouped.entries()) {
     lines.push(`section ${sanitizeMermaidLabel(user) || "Sin asignar"}`);
-    for (const task of userTasks) {
+    userTasks.forEach((task, taskIndex) => {
       const safeTask = sanitizeMermaidLabel(task.descripcion) || `Tarea ${idCounter}`;
       const taskId = `u${idCounter}`;
       const durationDays = Math.min(4, Math.max(1, Math.ceil(safeTask.length / 36)));
-      lines.push(`${safeTask} :${taskId}, ${toIsoDate(cursor)}, ${durationDays}d`);
+      const tags = getGanttTaskTags(task.descripcion, taskIndex);
+      const tagsPrefix = tags.length > 0 ? `${tags.join(", ")}, ` : "";
+      lines.push(`${safeTask} :${tagsPrefix}${taskId}, ${toIsoDate(cursor)}, ${durationDays}d`);
       cursor = addDays(cursor, 1);
       idCounter += 1;
-    }
+    });
   }
 
   if (idCounter === 1) {
     lines.push("section General");
-    lines.push(`Definir plan de accion :u1, ${toIsoDate(cursor)}, 2d`);
+    lines.push(`Definir plan de accion :active, u1, ${toIsoDate(cursor)}, 2d`);
   }
 
   return lines.join("\n");
@@ -259,6 +318,12 @@ const buildUserGantt = (tasks: MeetingTask[]) => {
 interface ThemeGroup {
   theme: string;
   users: Array<{ user: string; tasks: MeetingTask[] }>;
+}
+
+interface TaskDetailSelection {
+  task: MeetingTask;
+  theme: string;
+  user: string;
 }
 
 const groupTasksByThemeAndUser = (tasks: MeetingTask[]): ThemeGroup[] => {
@@ -294,26 +359,239 @@ const getUserColorClass = (user: string, seed: number) => {
   return USER_COLOR_PALETTE[idx];
 };
 
+const shuffleArray = <T,>(items: T[]) => {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [next[index], next[randomIndex]] = [next[randomIndex], next[index]];
+  }
+  return next;
+};
+
+const waitMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const withFlowSimulationStyles = (
+  baseFlowCode: string,
+  activeNodeId: string | null,
+  completedNodeIds: string[],
+) => {
+  if (!baseFlowCode) return "";
+
+  const lines = baseFlowCode.split("\n");
+  const taskNodeIds = Array.from(
+    new Set(
+      lines
+        .map((line) => line.match(/^\s*(K\d+)\s*\[/)?.[1])
+        .filter((nodeId): nodeId is string => Boolean(nodeId)),
+    ),
+  );
+
+  const allNodeIds = ["NSTART", ...taskNodeIds, "NEND"];
+  const completedSet = new Set(completedNodeIds);
+
+  const classDefs = [
+    "classDef mmIdle fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,color:#0f172a;",
+    "classDef mmQueued fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;",
+    "classDef mmDone fill:#dcfce7,stroke:#16a34a,stroke-width:3px,color:#14532d;",
+    "classDef mmActive fill:#fef3c7,stroke:#f59e0b,stroke-width:4px,color:#78350f,stroke-dasharray:10 6;",
+  ];
+
+  const classLines = allNodeIds.map((nodeId) => {
+    const className = completedSet.has(nodeId)
+      ? "mmDone"
+      : activeNodeId === nodeId
+        ? "mmActive"
+        : nodeId.startsWith("K")
+          ? "mmQueued"
+          : "mmIdle";
+
+    return `class ${nodeId} ${className}`;
+  });
+
+  const edgeLines = lines.filter((line) => /-->|-\.->/.test(line));
+  const linkStyles = edgeLines
+    .map((edgeLine, index) => {
+      const match = edgeLine.match(/^\s*([A-Za-z0-9_]+)\s+(-\.->|-->)\s+([A-Za-z0-9_]+)/);
+      if (!match) return `linkStyle ${index} stroke:#94a3b8,stroke-width:1.6px,opacity:0.45;`;
+
+      const fromNode = match[1];
+      const toNode = match[3];
+      const touchesActive =
+        activeNodeId != null && (fromNode === activeNodeId || toNode === activeNodeId);
+      const isCompletedEdge = completedSet.has(fromNode) && completedSet.has(toNode);
+
+      if (touchesActive) {
+        return `linkStyle ${index} stroke:#f59e0b,stroke-width:3px,opacity:1;`;
+      }
+      if (isCompletedEdge) {
+        return `linkStyle ${index} stroke:#16a34a,stroke-width:2.6px,opacity:0.95;`;
+      }
+      return `linkStyle ${index} stroke:#94a3b8,stroke-width:1.6px,opacity:0.45;`;
+    })
+    .filter(Boolean);
+
+  return [baseFlowCode, ...classDefs, ...classLines, ...linkStyles].join("\n");
+};
+
 export default function MeetingSummary() {
   const [meetingResult, setMeetingResult] = useState<MeetingProcessResult | null>(null);
   const [userColorSeed, setUserColorSeed] = useState(() => Math.floor(Math.random() * 100000));
+  const flowSimulationRunIdRef = useRef(0);
 
   const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
   const [isFlowModalOpen, setIsFlowModalOpen] = useState(false);
   const [isGanttModalOpen, setIsGanttModalOpen] = useState(false);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskDetailSelection | null>(null);
+  const [isFlowSimulationRunning, setIsFlowSimulationRunning] = useState(false);
+  const [activeSimulationNodeId, setActiveSimulationNodeId] = useState<string | null>(null);
+  const [completedSimulationNodeIds, setCompletedSimulationNodeIds] = useState<string[]>([]);
+  const [lastStepDurationMs, setLastStepDurationMs] = useState<number | null>(null);
 
   const tasks = meetingResult?.tareas || [];
   const groupedTasks = useMemo(() => groupTasksByThemeAndUser(tasks), [tasks]);
+  const firstTaskDetail = useMemo<TaskDetailSelection | null>(() => {
+    const firstTheme = groupedTasks[0];
+    const firstUser = firstTheme?.users[0];
+    const firstTask = firstUser?.tasks[0];
+    if (!firstTheme || !firstUser || !firstTask) return null;
+    return {
+      task: firstTask,
+      theme: firstTheme.theme,
+      user: firstUser.user,
+    };
+  }, [groupedTasks]);
   const horizontalFlowCode = useMemo(
     () => buildCrossDependencyFlow(tasks, meetingResult?.mermaid_codigo || ""),
     [meetingResult?.mermaid_codigo, tasks],
   );
+  const taskLabelByNodeId = useMemo(() => {
+    const labels = new Map<string, string>([
+      ["NSTART", "Inicio"],
+      ["NEND", "Cierre"],
+    ]);
+    tasks.forEach((task, index) => {
+      labels.set(`K${index + 1}`, task.descripcion || `Tarea ${index + 1}`);
+    });
+    return labels;
+  }, [tasks]);
+  const simulatedFlowCode = useMemo(
+    () =>
+      withFlowSimulationStyles(
+        horizontalFlowCode,
+        activeSimulationNodeId,
+        completedSimulationNodeIds,
+      ),
+    [activeSimulationNodeId, completedSimulationNodeIds, horizontalFlowCode],
+  );
   const userGanttCode = useMemo(() => buildUserGantt(tasks), [tasks]);
+  const totalFlowSteps = tasks.length + 2;
+  const completedFlowSteps = completedSimulationNodeIds.length;
+  const flowProgressPercent = Math.max(
+    0,
+    Math.min(100, Math.round((completedFlowSteps / Math.max(1, totalFlowSteps)) * 100)),
+  );
+
+  const stopFlowSimulation = () => {
+    flowSimulationRunIdRef.current += 1;
+    setIsFlowSimulationRunning(false);
+    setActiveSimulationNodeId(null);
+  };
+
+  const startFlowSimulation = async () => {
+    if (tasks.length === 0) return;
+
+    const runId = flowSimulationRunIdRef.current + 1;
+    flowSimulationRunIdRef.current = runId;
+    setIsFlowSimulationRunning(true);
+    setCompletedSimulationNodeIds([]);
+    setActiveSimulationNodeId(null);
+    setLastStepDurationMs(null);
+
+    const taskNodeIds = tasks.map((_, index) => `K${index + 1}`);
+    const randomizedTaskPath = shuffleArray(taskNodeIds);
+    const simulationPath = ["NSTART", ...randomizedTaskPath, "NEND"];
+
+    for (const nodeId of simulationPath) {
+      if (flowSimulationRunIdRef.current !== runId) {
+        return;
+      }
+
+      const stepDurationMs =
+        nodeId === "NSTART" || nodeId === "NEND"
+          ? 500 + Math.floor(Math.random() * 500)
+          : 900 + Math.floor(Math.random() * 1700);
+
+      setActiveSimulationNodeId(nodeId);
+      setLastStepDurationMs(stepDurationMs);
+      await waitMs(stepDurationMs);
+
+      if (flowSimulationRunIdRef.current !== runId) {
+        return;
+      }
+
+      setCompletedSimulationNodeIds((prev) =>
+        prev.includes(nodeId) ? prev : [...prev, nodeId],
+      );
+      setActiveSimulationNodeId(null);
+      await waitMs(150);
+    }
+
+    if (flowSimulationRunIdRef.current === runId) {
+      setIsFlowSimulationRunning(false);
+      setActiveSimulationNodeId(null);
+    }
+  };
+
+  const handleToggleFlowSimulation = () => {
+    if (isFlowSimulationRunning) {
+      stopFlowSimulation();
+      return;
+    }
+    void startFlowSimulation();
+  };
+
+  const handleFlowModalOpenChange = (open: boolean) => {
+    setIsFlowModalOpen(open);
+    if (!open) {
+      stopFlowSimulation();
+      setCompletedSimulationNodeIds([]);
+      setLastStepDurationMs(null);
+    }
+  };
 
   const handleProcessed = (result: MeetingProcessResult) => {
+    stopFlowSimulation();
+    setCompletedSimulationNodeIds([]);
+    setLastStepDurationMs(null);
     setMeetingResult(result);
     setUserColorSeed(Math.floor(Math.random() * 100000));
+    setSelectedTaskDetail(null);
   };
+
+  const relatedBySameOwner = useMemo(() => {
+    if (!selectedTaskDetail) return [];
+    return tasks
+      .filter(
+        (task) =>
+          (task.responsable?.trim() || "Sin asignar") === selectedTaskDetail.user &&
+          task.descripcion !== selectedTaskDetail.task.descripcion,
+      )
+      .slice(0, 4);
+  }, [selectedTaskDetail, tasks]);
+
+  const relatedBySameTheme = useMemo(() => {
+    if (!selectedTaskDetail) return [];
+    return tasks
+      .filter(
+        (task) =>
+          detectTheme(task.descripcion || "") === selectedTaskDetail.theme &&
+          task.descripcion !== selectedTaskDetail.task.descripcion,
+      )
+      .slice(0, 4);
+  }, [selectedTaskDetail, tasks]);
 
   return (
     <div className="min-h-screen app-background">
@@ -378,7 +656,12 @@ export default function MeetingSummary() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <Button
-                  onClick={() => setIsTasksModalOpen(true)}
+                  onClick={() => {
+                    if (!selectedTaskDetail && firstTaskDetail) {
+                      setSelectedTaskDetail(firstTaskDetail);
+                    }
+                    setIsTasksModalOpen(true);
+                  }}
                   disabled={!meetingResult}
                   className="h-auto flex-col items-start gap-1 py-3"
                   variant={meetingResult ? "default" : "secondary"}
@@ -431,47 +714,143 @@ export default function MeetingSummary() {
               Agrupacion automatica por tema con color de usuario aleatorio.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 overflow-y-auto pr-1">
-            {groupedTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No hay tareas para mostrar todavia.
-              </p>
-            )}
-            {groupedTasks.map((themeGroup) => (
-              <div
-                key={themeGroup.theme}
-                className="rounded-lg border border-border bg-background/80 p-4"
-              >
-                <h3 className="text-sm font-semibold text-foreground">{themeGroup.theme}</h3>
-                <div className="mt-3 space-y-3">
-                  {themeGroup.users.map((entry) => (
-                    <div key={`${themeGroup.theme}-${entry.user}`} className="space-y-2">
+          <div className="grid h-[68vh] gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="space-y-4 overflow-y-auto pr-1">
+              {groupedTasks.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No hay tareas para mostrar todavia.
+                </p>
+              )}
+              {groupedTasks.map((themeGroup) => (
+                <div
+                  key={themeGroup.theme}
+                  className="rounded-lg border border-border bg-background/80 p-4"
+                >
+                  <h3 className="text-sm font-semibold text-foreground">{themeGroup.theme}</h3>
+                  <div className="mt-3 space-y-3">
+                    {themeGroup.users.map((entry) => (
+                      <div key={`${themeGroup.theme}-${entry.user}`} className="space-y-2">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getUserColorClass(entry.user, userColorSeed)}`}
+                        >
+                          {entry.user}
+                        </span>
+                        <ul className="space-y-1.5">
+                          {entry.tasks.map((task, index) => {
+                            const isSelected =
+                              selectedTaskDetail?.task.descripcion === task.descripcion &&
+                              selectedTaskDetail?.user === entry.user &&
+                              selectedTaskDetail?.theme === themeGroup.theme;
+
+                            return (
+                              <li key={`${entry.user}-${task.descripcion}-${index}`}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedTaskDetail({
+                                      task,
+                                      theme: themeGroup.theme,
+                                      user: entry.user,
+                                    })
+                                  }
+                                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                                    isSelected
+                                      ? "border-primary bg-primary/10 text-foreground"
+                                      : "border-border bg-card text-foreground hover:border-primary/50"
+                                  }`}
+                                >
+                                  {task.descripcion}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <aside className="rounded-lg border border-border bg-background/80 p-4">
+              {selectedTaskDetail ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Detalle de tarea
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {selectedTaskDetail.task.descripcion}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="font-semibold text-foreground">Responsable:</span>{" "}
                       <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getUserColorClass(entry.user, userColorSeed)}`}
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${getUserColorClass(selectedTaskDetail.user, userColorSeed)}`}
                       >
-                        {entry.user}
+                        {selectedTaskDetail.user}
                       </span>
+                    </p>
+                    <p>
+                      <span className="font-semibold text-foreground">Tematica:</span>{" "}
+                      <span className="text-foreground/90">{selectedTaskDetail.theme}</span>
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Relacionadas por responsable
+                    </p>
+                    {relatedBySameOwner.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No hay relacionadas.</p>
+                    ) : (
                       <ul className="space-y-1.5">
-                        {entry.tasks.map((task, index) => (
+                        {relatedBySameOwner.map((task, index) => (
                           <li
-                            key={`${entry.user}-${task.descripcion}-${index}`}
-                            className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                            key={`owner-${task.descripcion}-${index}`}
+                            className="rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground"
                           >
                             {task.descripcion}
                           </li>
                         ))}
                       </ul>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Relacionadas por tematica
+                    </p>
+                    {relatedBySameTheme.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No hay relacionadas.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {relatedBySameTheme.map((task, index) => (
+                          <li
+                            key={`theme-${task.descripcion}-${index}`}
+                            className="rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground"
+                          >
+                            {task.descripcion}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Haz click en una tarea para ver su informacion.
+                </p>
+              )}
+            </aside>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isFlowModalOpen} onOpenChange={setIsFlowModalOpen}>
-        <DialogContent className="top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none">
+      <Dialog open={isFlowModalOpen} onOpenChange={handleFlowModalOpenChange}>
+        <DialogContent className="!inset-0 !top-0 !left-0 !h-[100dvh] !w-[100vw] !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:!max-w-none">
           <div className="flex h-full flex-col">
             <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
               <DialogTitle className="text-lg font-semibold text-foreground">
@@ -480,11 +859,65 @@ export default function MeetingSummary() {
               <DialogDescription className="text-sm text-muted-foreground">
                 Vista completa de dependencias y secuencia de acciones.
               </DialogDescription>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={handleToggleFlowSimulation}
+                  disabled={tasks.length === 0}
+                  className="h-8 px-3"
+                  variant={isFlowSimulationRunning ? "destructive" : "default"}
+                >
+                  {isFlowSimulationRunning ? (
+                    <>
+                      <Square className="mr-2 h-3.5 w-3.5" />
+                      Detener
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-3.5 w-3.5" />
+                      Play
+                    </>
+                  )}
+                </Button>
+                <Badge
+                  className={
+                    isFlowSimulationRunning
+                      ? "border-amber-200 bg-amber-100 text-amber-800"
+                      : "border-emerald-200 bg-emerald-100 text-emerald-800"
+                  }
+                >
+                  {isFlowSimulationRunning ? "En ejecucion" : "En pausa"}
+                </Badge>
+                {activeSimulationNodeId && (
+                  <Badge className="border-primary/30 bg-primary/10 text-primary">
+                    {taskLabelByNodeId.get(activeSimulationNodeId) || activeSimulationNodeId}
+                  </Badge>
+                )}
+                {lastStepDurationMs && (
+                  <span className="text-xs text-muted-foreground">
+                    Paso: {(lastStepDurationMs / 1000).toFixed(1)}s
+                  </span>
+                )}
+                <div className="ml-auto flex min-w-[220px] items-center gap-2">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500 transition-all duration-500 ${
+                        isFlowSimulationRunning ? "animate-pulse" : ""
+                      }`}
+                      style={{ width: `${flowProgressPercent}%` }}
+                    />
+                  </div>
+                  <span className="min-w-10 text-right text-xs text-muted-foreground">
+                    {flowProgressPercent}%
+                  </span>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 min-h-0 p-0">
               <DiagramViewer
-                mermaidCode={horizontalFlowCode}
+                mermaidCode={simulatedFlowCode}
                 diagramType="flowchart"
+                defaultZoom={0.75}
                 fallbackItems={tasks.map(
                   (task) => `${task.descripcion} (${task.responsable || "Sin asignar"})`,
                 )}
@@ -495,7 +928,7 @@ export default function MeetingSummary() {
       </Dialog>
 
       <Dialog open={isGanttModalOpen} onOpenChange={setIsGanttModalOpen}>
-        <DialogContent className="top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none">
+        <DialogContent className="!inset-0 !top-0 !left-0 !h-[100dvh] !w-[100vw] !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:!max-w-none">
           <div className="flex h-full flex-col">
             <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
               <DialogTitle className="text-lg font-semibold text-foreground">
@@ -505,10 +938,11 @@ export default function MeetingSummary() {
                 Plan visual de ejecucion distribuido por responsables.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 min-h-0 p-0">
               <DiagramViewer
                 mermaidCode={userGanttCode}
                 diagramType="gantt"
+                defaultZoom={1}
                 fallbackItems={tasks.map(
                   (task) => `${task.responsable || "Sin asignar"} - ${task.descripcion}`,
                 )}
