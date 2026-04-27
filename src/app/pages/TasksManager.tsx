@@ -113,7 +113,7 @@ export default function TasksManager() {
       const taskList = tasks
         .map((t) => `- ${t.title} [${t.priority}] [${t.status}]${t.blocked ? " [BLOQUEADA]" : ""}`)
         .join("\n");
-      const json = await postApiJson<any>("/api/generate-summary", {
+      const json = await postApiJson<any>("/api/summary", {
         transcript: `Lista de tareas del equipo:\n${taskList}`,
         format: "resumen",
         detailLevel: "Corto",

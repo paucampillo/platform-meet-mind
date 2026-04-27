@@ -297,11 +297,13 @@ export default function Dashboard() {
           <p className="text-xl text-gray-600 mb-8">
             Tus reuniones convertidas en decisiones, tareas y agenda automáticamente.
           </p>
-          <Button size="lg" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-lg px-8 py-6">
-            <Sparkles className="w-5 h-5" />
-            Iniciar nueva sesión
-            <ArrowRight className="w-5 h-5" />
-          </Button>
+          <Link to="/meeting/1/summary">
+            <Button size="lg" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-lg px-8 py-6">
+              <Sparkles className="w-5 h-5" />
+              Iniciar nueva sesión
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </Link>
         </div>
 
         {/* Personal Insights Mini Cards */}

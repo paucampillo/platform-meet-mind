@@ -321,7 +321,7 @@ Ana Martínez [00:21:00]: Excelente. Reunión de seguimiento el 10 de marzo. Tod
     setIsGenerating(true);
     setGenerateError(null);
     try {
-      const json = await postApiJson<any>("/api/generate-summary", {
+      const json = await postApiJson<any>("/api/summary", {
         transcript: transcriptText,
         format: selectedFormat,
         detailLevel,
