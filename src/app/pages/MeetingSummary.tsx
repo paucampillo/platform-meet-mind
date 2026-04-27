@@ -1,601 +1,522 @@
-﻿import React, { useState } from "react";
-import { Button } from "../components/ui/button";
-import { Card, CardContent } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { SegmentedControl } from "../components/SegmentedControl";
-import { Chip } from "../components/Chip";
-import { CardOption } from "../components/CardOption";
-import { ActionBar } from "../components/ActionBar";
-import { OutlineItem } from "../components/OutlineItem";
-import { ConceptNode } from "../components/ConceptNode";
+import { useMemo, useState } from "react";
 import {
   Brain,
-  ChevronRight,
-  Upload,
-  Share2,
-  FileText,
-  List,
+  CalendarRange,
+  CheckSquare,
   Network,
   Sparkles,
-  Loader2,
-  ExternalLink,
-  Search,
-  Filter,
-  Maximize2,
 } from "lucide-react";
-import { postApiJson } from "../lib/apiClient";
+
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { DiagramViewer } from "../components/DiagramViewer";
+import { MeetingInput } from "../components/MeetingInput";
+import type { MeetingProcessResult, MeetingTask } from "../components/meeting-flow/types";
+
+const DEFAULT_TRANSCRIPT = `Ana Martinez [00:12:34]: Para el proximo trimestre, necesitamos migrar a una arquitectura de microservicios antes de junio.
+
+Carlos Lopez [00:13:15]: Puedo encargarme de la documentacion tecnica y preparar el plan de migracion.
+
+Maria Torres [00:14:02]: Propongo organizar sesiones de capacitacion en la nueva arquitectura.
+
+David Ruiz [00:17:30]: Necesitamos aprobar el incremento presupuestario para infraestructura cloud.`;
+
+const USER_COLOR_PALETTE = [
+  "border-rose-200 bg-rose-100 text-rose-700",
+  "border-sky-200 bg-sky-100 text-sky-700",
+  "border-emerald-200 bg-emerald-100 text-emerald-700",
+  "border-amber-200 bg-amber-100 text-amber-700",
+  "border-indigo-200 bg-indigo-100 text-indigo-700",
+  "border-fuchsia-200 bg-fuchsia-100 text-fuchsia-700",
+];
+
+const THEME_RULES: Array<{ theme: string; keywords: string[] }> = [
+  {
+    theme: "Arquitectura e infraestructura",
+    keywords: ["microserv", "arquitect", "infra", "cloud", "migr", "sistema"],
+  },
+  {
+    theme: "Producto y experiencia",
+    keywords: ["ux", "ui", "landing", "diseno", "protot", "feature", "beta"],
+  },
+  {
+    theme: "Comunicacion y marketing",
+    keywords: ["marketing", "campana", "email", "anuncio", "redes", "lead"],
+  },
+  {
+    theme: "Operacion y gestion",
+    keywords: ["presupuesto", "aprob", "plan", "document", "capacit", "seguimiento"],
+  },
+];
+
+const hashString = (input: string) => {
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+const sanitizeMermaidLabel = (label: string) =>
+  String(label || "")
+    .replace(/"/g, "'")
+    .replace(/[<>]/g, "")
+    .replace(/\[/g, "(")
+    .replace(/\]/g, ")")
+    .replace(/\{/g, "(")
+    .replace(/\}/g, ")")
+    .replace(/\|/g, "/")
+    .replace(/:/g, " -")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const detectTheme = (description: string) => {
+  const normalized = description.toLowerCase();
+  for (const rule of THEME_RULES) {
+    if (rule.keywords.some((keyword) => normalized.includes(keyword))) {
+      return rule.theme;
+    }
+  }
+  return "General";
+};
+
+const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+};
+
+const ensureHorizontalFlow = (mermaidCode: string) => {
+  const cleaned = String(mermaidCode || "").trim();
+  if (!cleaned) return "";
+  if (/^flowchart\s+LR\b/i.test(cleaned)) return cleaned;
+  if (/^flowchart\s+TD\b/i.test(cleaned)) return cleaned.replace(/^flowchart\s+TD\b/i, "flowchart LR");
+  if (/^graph\s+TD\b/i.test(cleaned)) return cleaned.replace(/^graph\s+TD\b/i, "flowchart LR");
+  if (/^(flowchart|graph)\b/i.test(cleaned)) return cleaned;
+  return `flowchart LR\n${cleaned}`;
+};
+
+const buildCrossDependencyFlow = (
+  tasks: MeetingTask[],
+  fallbackMermaidCode: string,
+) => {
+  if (tasks.length === 0) {
+    return ensureHorizontalFlow(
+      fallbackMermaidCode ||
+        'flowchart LR\nNSTART["Inicio"] --> NOTE["Sin tareas detectadas"] --> NEND["Cierre"]',
+    );
+  }
+
+  const lines: string[] = ["flowchart LR", 'NSTART["Inicio"]', 'NEND["Cierre"]'];
+
+  const themeOrder: string[] = [];
+  const themeTaskIds = new Map<string, string[]>();
+  const userTaskIds = new Map<string, string[]>();
+  const taskRecords = tasks.map((task, index) => {
+    const id = `K${index + 1}`;
+    const theme = detectTheme(task.descripcion || "");
+    const user = task.responsable?.trim() || "Sin asignar";
+    const label = sanitizeMermaidLabel(
+      `${task.descripcion || "Tarea"} (${user})`,
+    ).slice(0, 90);
+
+    if (!themeTaskIds.has(theme)) {
+      themeTaskIds.set(theme, []);
+      themeOrder.push(theme);
+    }
+    themeTaskIds.get(theme)?.push(id);
+
+    if (!userTaskIds.has(user)) {
+      userTaskIds.set(user, []);
+    }
+    userTaskIds.get(user)?.push(id);
+
+    return { id, theme, user, label, index };
+  });
+
+  const themeNodeIdByName = new Map<string, string>();
+  themeOrder.forEach((theme, index) => {
+    const themeNodeId = `TH${index + 1}`;
+    themeNodeIdByName.set(theme, themeNodeId);
+    lines.push(`${themeNodeId}["${sanitizeMermaidLabel(theme)}"]`);
+    lines.push(`NSTART --> ${themeNodeId}`);
+  });
+
+  taskRecords.forEach((task) => {
+    lines.push(`${task.id}["${task.label}"]`);
+    const themeNodeId = themeNodeIdByName.get(task.theme);
+    if (themeNodeId) {
+      lines.push(`${themeNodeId} --> ${task.id}`);
+    }
+  });
+
+  // Sequential flow inside each theme.
+  for (const taskIds of themeTaskIds.values()) {
+    for (let index = 0; index < taskIds.length - 1; index += 1) {
+      lines.push(`${taskIds[index]} --> ${taskIds[index + 1]}`);
+    }
+  }
+
+  // Cross dependencies by same owner (non-blocking dashed dependency).
+  for (const taskIds of userTaskIds.values()) {
+    if (taskIds.length < 2) continue;
+    for (let index = 0; index < taskIds.length - 1; index += 1) {
+      lines.push(`${taskIds[index]} -.-> ${taskIds[index + 1]}`);
+    }
+  }
+
+  const lowerDescriptions = tasks.map((task) => (task.descripcion || "").toLowerCase());
+  const enableKeywords = ["aprobar", "definir", "disenar", "document", "plan"];
+  const executeKeywords = ["implementar", "programar", "migrar", "lanzar", "ejecut", "desplegar"];
+
+  // Cross dependencies by semantic enablement: approval/planning tasks enable execution tasks.
+  taskRecords.forEach((targetTask) => {
+    const targetDesc = lowerDescriptions[targetTask.index];
+    const isExecutionTask = executeKeywords.some((keyword) => targetDesc.includes(keyword));
+    if (!isExecutionTask) return;
+
+    for (let sourceIndex = 0; sourceIndex < targetTask.index; sourceIndex += 1) {
+      const sourceDesc = lowerDescriptions[sourceIndex];
+      const isEnableTask = enableKeywords.some((keyword) => sourceDesc.includes(keyword));
+      if (!isEnableTask) continue;
+
+      const sourceTask = taskRecords[sourceIndex];
+      lines.push(`${sourceTask.id} -.-> ${targetTask.id}`);
+      break;
+    }
+  });
+
+  const hasOutgoing = new Set<string>();
+  lines.forEach((line) => {
+    const direct = line.match(/^(K\d+)\s+-->|^(K\d+)\s+\.-/);
+    if (direct?.[1]) hasOutgoing.add(direct[1]);
+    if (direct?.[2]) hasOutgoing.add(direct[2]);
+  });
+
+  taskRecords.forEach((task) => {
+    if (!hasOutgoing.has(task.id)) {
+      lines.push(`${task.id} --> NEND`);
+    }
+  });
+
+  return lines.join("\n");
+};
+
+const buildUserGantt = (tasks: MeetingTask[]) => {
+  const baseDate = new Date();
+  const normalizedBaseDate = new Date(
+    Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate()),
+  );
+
+  const grouped = new Map<string, MeetingTask[]>();
+  for (const task of tasks) {
+    const user = task.responsable?.trim() || "Sin asignar";
+    if (!grouped.has(user)) grouped.set(user, []);
+    grouped.get(user)?.push(task);
+  }
+
+  const lines = [
+    "gantt",
+    "title Gantt por usuarios y tareas",
+    "dateFormat YYYY-MM-DD",
+    "axisFormat %d/%m",
+  ];
+
+  let cursor = normalizedBaseDate;
+  let idCounter = 1;
+
+  for (const [user, userTasks] of grouped.entries()) {
+    lines.push(`section ${sanitizeMermaidLabel(user) || "Sin asignar"}`);
+    for (const task of userTasks) {
+      const safeTask = sanitizeMermaidLabel(task.descripcion) || `Tarea ${idCounter}`;
+      const taskId = `u${idCounter}`;
+      const durationDays = Math.min(4, Math.max(1, Math.ceil(safeTask.length / 36)));
+      lines.push(`${safeTask} :${taskId}, ${toIsoDate(cursor)}, ${durationDays}d`);
+      cursor = addDays(cursor, 1);
+      idCounter += 1;
+    }
+  }
+
+  if (idCounter === 1) {
+    lines.push("section General");
+    lines.push(`Definir plan de accion :u1, ${toIsoDate(cursor)}, 2d`);
+  }
+
+  return lines.join("\n");
+};
+
+interface ThemeGroup {
+  theme: string;
+  users: Array<{ user: string; tasks: MeetingTask[] }>;
+}
+
+const groupTasksByThemeAndUser = (tasks: MeetingTask[]): ThemeGroup[] => {
+  const map = new Map<string, Map<string, MeetingTask[]>>();
+
+  for (const task of tasks) {
+    const theme = detectTheme(task.descripcion || "");
+    const user = task.responsable?.trim() || "Sin asignar";
+
+    if (!map.has(theme)) {
+      map.set(theme, new Map());
+    }
+    const usersMap = map.get(theme)!;
+    if (!usersMap.has(user)) {
+      usersMap.set(user, []);
+    }
+    usersMap.get(user)!.push(task);
+  }
+
+  return Array.from(map.entries())
+    .map(([theme, usersMap]) => ({
+      theme,
+      users: Array.from(usersMap.entries()).map(([user, groupedTasks]) => ({
+        user,
+        tasks: groupedTasks,
+      })),
+    }))
+    .sort((a, b) => a.theme.localeCompare(b.theme));
+};
+
+const getUserColorClass = (user: string, seed: number) => {
+  const idx = hashString(`${seed}-${user}`) % USER_COLOR_PALETTE.length;
+  return USER_COLOR_PALETTE[idx];
+};
 
 export default function MeetingSummary() {
-  const [selectedFormat, setSelectedFormat] = useState<"resumen" | "esquema" | "mapa">("resumen");
-  const [detailLevel, setDetailLevel] = useState("Medio");
-  const [selectedFocus, setSelectedFocus] = useState<string[]>(["Visión general"]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [hasContent, setHasContent] = useState(true);
-  const [generatedContent, setGeneratedContent] = useState<any>(null);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const [transcriptText, setTranscriptText] = useState("Ana Martínez [00:12:34]: Para el próximo trimestre, necesitamos migrar a una arquitectura de microservicios antes de junio.\n\nCarlos López [00:13:15]: Puedo encargarme de la documentación técnica y preparar el plan de migración.\n\nMaría Torres [00:14:02]: Propongo organizar sesiones de capacitación en la nueva arquitectura.\n\nDavid Ruiz [00:17:30]: Necesitamos aprobar el incremento presupuestario para infraestructura cloud.");
+  const [meetingResult, setMeetingResult] = useState<MeetingProcessResult | null>(null);
+  const [userColorSeed, setUserColorSeed] = useState(() => Math.floor(Math.random() * 100000));
 
-  const formats = [
-    {
-      id: "resumen" as const,
-      icon: FileText,
-      title: "Resumen",
-      description: "Puntos clave y decisiones",
-    },
-    {
-      id: "esquema" as const,
-      icon: List,
-      title: "Esquema",
-      description: "Estructura jerárquica",
-    },
-    {
-      id: "mapa" as const,
-      icon: Network,
-      title: "Mapa conceptual",
-      description: "Relaciones visuales",
-    },
-  ];
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
+  const [isFlowModalOpen, setIsFlowModalOpen] = useState(false);
+  const [isGanttModalOpen, setIsGanttModalOpen] = useState(false);
 
-  const focusOptions = ["Visión general", "Temas tratados", "Decisiones", "Acciones"];
+  const tasks = meetingResult?.tareas || [];
+  const groupedTasks = useMemo(() => groupTasksByThemeAndUser(tasks), [tasks]);
+  const horizontalFlowCode = useMemo(
+    () => buildCrossDependencyFlow(tasks, meetingResult?.mermaid_codigo || ""),
+    [meetingResult?.mermaid_codigo, tasks],
+  );
+  const userGanttCode = useMemo(() => buildUserGantt(tasks), [tasks]);
 
-  const toggleFocus = (focus: string) => {
-    setSelectedFocus((prev) =>
-      prev.includes(focus) ? prev.filter((f) => f !== focus) : [...prev, focus]
-    );
-  };
-
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    setGenerateError(null);
-    try {
-      const json = await postApiJson<any>("/api/generate-summary", {
-        transcript: transcriptText,
-        format: selectedFormat,
-        detailLevel,
-        focusAreas: selectedFocus,
-      });
-      if (json.success) {
-        setGeneratedContent(json.data);
-        setHasContent(true);
-      } else {
-        setGenerateError(json.error || "Error generando el contenido");
-      }
-    } catch (err: any) {
-      setGenerateError(err?.message || "No se pudo generar el contenido.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const summaryData = {
-    keyPoints: [
-      "Migración a microservicios aprobada para mejorar escalabilidad",
-      "Implementación de autenticación multi-factor como prioridad alta",
-      "Lanzamiento de versión beta pública programado para abril 2026",
-      "Presupuesto adicional aprobado para infraestructura cloud",
-    ],
-    topics: [
-      "Arquitectura técnica",
-      "Seguridad",
-      "Roadmap de producto",
-      "Recursos y presupuesto",
-    ],
-    decisions: [
-      { decision: "Migrar a microservicios", owner: "Carlos Ruiz", date: "Q2 2026" },
-      { decision: "Implementar MFA", owner: "Laura Martínez", date: "Marzo 2026" },
-      { decision: "Lanzar beta pública", owner: "María García", date: "Abril 2026" },
-    ],
-  };
-
-  const outlineData = [
-    {
-      title: "1. Contexto y objetivos",
-      level: 0,
-      children: [
-        {
-          title: "1.1 Situación actual",
-          level: 1,
-          content: [
-            "La plataforma actual tiene limitaciones de escalabilidad",
-            "Se proyecta un crecimiento de 100k usuarios simultáneos",
-          ],
-        },
-        {
-          title: "1.2 Objetivos del Q1 2026",
-          level: 1,
-          content: [
-            "Mejorar la infraestructura para soportar crecimiento",
-            "Aumentar la seguridad con MFA",
-            "Preparar lanzamiento de beta pública",
-          ],
-        },
-      ],
-    },
-    {
-      title: "2. Decisiones técnicas",
-      level: 0,
-      children: [
-        {
-          title: "2.1 Arquitectura",
-          level: 1,
-          content: [
-            "Migración completa a microservicios",
-            "Implementación en fases durante Q2",
-            "Evaluación de proveedores cloud",
-          ],
-        },
-        {
-          title: "2.2 Seguridad",
-          level: 1,
-          content: [
-            "Autenticación multi-factor obligatoria",
-            "Auditoría de seguridad externa",
-            "Cumplimiento con estándares SOC 2",
-          ],
-        },
-      ],
-    },
-    {
-      title: "3. Plan de acción",
-      level: 0,
-      children: [
-        {
-          title: "3.1 Tareas inmediatas",
-          level: 1,
-          content: [
-            "Crear documento de arquitectura detallado",
-            "Asignar recursos al equipo de seguridad",
-            "Programar reunión de seguimiento en 2 semanas",
-          ],
-        },
-      ],
-    },
-  ];
-
-  const conceptNodes = [
-    {
-      id: "1",
-      title: "Escalabilidad",
-      description: "Necesidad principal",
-      type: "concept" as const,
-      x: 100,
-      y: 100,
-    },
-    {
-      id: "2",
-      title: "Microservicios",
-      description: "Solución técnica",
-      type: "decision" as const,
-      x: 350,
-      y: 100,
-    },
-    {
-      id: "3",
-      title: "Seguridad",
-      description: "Requerimiento crítico",
-      type: "concept" as const,
-      x: 100,
-      y: 250,
-    },
-    {
-      id: "4",
-      title: "Implementar MFA",
-      description: "Acción prioritaria",
-      type: "action" as const,
-      x: 350,
-      y: 250,
-    },
-    {
-      id: "5",
-      title: "Beta pública",
-      description: "Objetivo Q1",
-      type: "decision" as const,
-      x: 600,
-      y: 175,
-    },
-  ];
-
-  const renderContent = () => {
-    if (!hasContent) {
-      return (
-        <div className="flex flex-col items-center justify-center h-[500px] text-center">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <Sparkles className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Selecciona un formato y pulsa Generar
-          </h3>
-          <p className="text-sm text-gray-600">
-            Elige el nivel de detalle y enfoque que prefieras
-          </p>
-        </div>
-      );
-    }
-
-    switch (selectedFormat) {
-      case "resumen": {
-        const ai = generatedContent;
-        const keyPoints: string[] = ai?.keyPoints?.map((p: any) => typeof p === "string" ? p : p.text) || summaryData.keyPoints;
-        const decisions: any[] = ai?.decisions?.map((d: string, i: number) => ({ decision: d, owner: "—", date: "—" })) || summaryData.decisions;
-        return (
-          <div className="space-y-8">
-            {ai && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <span className="text-xs text-green-700 font-medium">✓ Generado por Claude AI desde tu transcripción</span>
-              </div>
-            )}
-            {ai?.context && (
-              <section>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Contexto</h3>
-                <p className="text-gray-700 leading-relaxed">{ai.context}</p>
-              </section>
-            )}
-            {/* Key Points */}
-            <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Puntos clave</h3>
-              <div className="space-y-3">
-                {keyPoints.map((point, index) => (
-                  <div key={index} className="flex items-start gap-3 group">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs font-semibold text-purple-700">{index + 1}</span>
-                    </div>
-                    <p className="flex-1 text-gray-700">{point}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Decisions */}
-            <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Decisiones</h3>
-              <Card className="border-gray-200">
-                <CardContent className="p-0">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Decisión</th>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Responsable</th>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Fecha</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {decisions.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{typeof item === "string" ? item : item.decision}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{item.owner || "—"}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.date || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            </section>
-          </div>
-        );
-      }
-
-      case "esquema":
-        return (
-          <div className="space-y-2">
-            {outlineData.map((item, index) => (
-              <OutlineItem key={index} {...item} />
-            ))}
-          </div>
-        );
-
-      case "mapa":
-        return (
-          <div className="flex gap-6">
-            {/* Canvas */}
-            <div className="flex-1">
-              <Card className="border-gray-200 bg-gray-50">
-                <CardContent className="p-8">
-                  <div className="relative h-[600px] bg-white rounded-lg border-2 border-dashed border-gray-300">
-                    {conceptNodes.map((node) => (
-                      <ConceptNode key={node.id} {...node} />
-                    ))}
-                    {/* Arrows/Connections */}
-                    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-                      <defs>
-                        <marker
-                          id="arrowhead"
-                          markerWidth="10"
-                          markerHeight="10"
-                          refX="9"
-                          refY="3"
-                          orient="auto"
-                        >
-                          <polygon points="0 0, 10 3, 0 6" fill="#9CA3AF" />
-                        </marker>
-                      </defs>
-                      <line
-                        x1="280"
-                        y1="130"
-                        x2="350"
-                        y2="130"
-                        stroke="#9CA3AF"
-                        strokeWidth="2"
-                        markerEnd="url(#arrowhead)"
-                      />
-                      <line
-                        x1="280"
-                        y1="280"
-                        x2="350"
-                        y2="280"
-                        stroke="#9CA3AF"
-                        strokeWidth="2"
-                        markerEnd="url(#arrowhead)"
-                      />
-                      <line
-                        x1="530"
-                        y1="130"
-                        x2="600"
-                        y2="175"
-                        stroke="#9CA3AF"
-                        strokeWidth="2"
-                        markerEnd="url(#arrowhead)"
-                      />
-                    </svg>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Side Panel */}
-            <div className="w-[280px] space-y-4">
-              <Card className="border-gray-200">
-                <CardContent className="p-4 space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input placeholder="Buscar nodos..." className="pl-9" />
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Filter className="w-4 h-4" />
-                    Filtrar por tipo
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Maximize2 className="w-4 h-4" />
-                    Auto-organizar
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-gray-200">
-                <CardContent className="p-4">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Nodos ({conceptNodes.length})</h4>
-                  <div className="space-y-2">
-                    {conceptNodes.map((node) => (
-                      <div
-                        key={node.id}
-                        className="p-2 rounded-lg hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              node.type === "concept"
-                                ? "bg-blue-500"
-                                : node.type === "decision"
-                                ? "bg-purple-500"
-                                : "bg-green-500"
-                            }`}
-                          />
-                          <span className="text-xs font-medium text-gray-900">{node.title}</span>
-                        </div>
-                        <p className="text-xs text-gray-600 line-clamp-1 pl-4">
-                          {node.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+  const handleProcessed = (result: MeetingProcessResult) => {
+    setMeetingResult(result);
+    setUserColorSeed(Math.floor(Math.random() * 100000));
   };
 
   return (
     <div className="min-h-screen app-background">
-      {/* Header */}
-      <header className="border-b border-gray-200 sticky top-0 bg-white z-50">
-        <div className="mx-auto px-20 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold">MeetMind</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span>Reuniones</span>
-              <ChevronRight className="w-4 h-4" />
-              <span>Reunión de planificación Q1 2026</span>
-              <ChevronRight className="w-4 h-4" />
-              <span className="text-gray-900 font-medium">Resumen</span>
-            </div>
-          </div>
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <Button className="gap-2 bg-purple-600 hover:bg-purple-700">
-              <Upload className="w-4 h-4" />
-              Exportar
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <Share2 className="w-4 h-4" />
-              Compartir
-            </Button>
-            <Avatar className="w-8 h-8">
-              <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Brain className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-foreground">MeetMind</p>
+              <p className="text-xs text-muted-foreground">Analisis visual de reuniones</p>
+            </div>
           </div>
+          <Badge className="border-primary/20 bg-primary/10 text-primary">
+            Beta privada
+          </Badge>
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="mx-auto px-20 py-8">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Column - Controls */}
-          <aside className="col-span-3">
-            <div className="sticky top-24 space-y-6">
-              {/* Formats */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Formatos</h3>
-                <div className="space-y-2">
-                  {formats.map((format) => (
-                    <CardOption
-                      key={format.id}
-                      icon={format.icon}
-                      title={format.title}
-                      description={format.description}
-                      selected={selectedFormat === format.id}
-                      onClick={() => setSelectedFormat(format.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Detail Level */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Nivel de detalle</h3>
-                <SegmentedControl
-                  options={["Corto", "Medio", "Detallado"]}
-                  value={detailLevel}
-                  onChange={setDetailLevel}
-                />
-              </div>
-
-              {/* Focus */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Enfoque</h3>
-                <div className="flex flex-wrap gap-2">
-                  {focusOptions.map((focus) => (
-                    <Chip
-                      key={focus}
-                      label={focus}
-                      selected={selectedFocus.includes(focus)}
-                      onClick={() => toggleFocus(focus)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Transcript input */}
-              <div>
-                <label className="text-xs font-semibold text-gray-700 block mb-1">Transcripción</label>
-                <textarea
-                  className="w-full h-28 text-xs p-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white font-mono"
-                  placeholder="Pega aquí la transcripción de tu reunión..."
-                  value={transcriptText}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTranscriptText(e.target.value)}
-                />
-              </div>
-
-              {generateError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs text-red-600">{generateError}</p>
-                </div>
-              )}
-
-              {/* Generate Button */}
-              <Button
-                onClick={handleGenerate}
-                disabled={isGenerating || !transcriptText.trim()}
-                className="w-full gap-2 bg-purple-600 hover:bg-purple-700"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generando...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generar
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-gray-500">
-                Basado en la transcripción de la reunión
+      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-2">
+        <section className="space-y-4">
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background shadow-sm">
+            <CardContent className="space-y-2 p-6">
+              <Badge className="w-fit border-primary/20 bg-primary/10 text-primary">
+                Captura de reunion
+              </Badge>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Captura y procesa tu reunion en segundos
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Inicia grabacion o pega texto. El sistema abstrae el resumen y activa vistas
+                detalladas de tareas, flujo y gantt.
               </p>
-            </div>
-          </aside>
+            </CardContent>
+          </Card>
 
-          {/* Right Column - Content */}
-          <div className="col-span-9">
-            <Card className="border-gray-200 shadow-sm">
-              <CardContent className="p-0">
-                {/* Callout */}
-                <div className="bg-purple-50 border-b border-purple-100 px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-4 h-4 text-white" />
+          <MeetingInput
+            initialText={DEFAULT_TRANSCRIPT}
+            onProcessed={handleProcessed}
+          />
+        </section>
+
+        <section className="space-y-4">
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Resultado IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="rounded-lg border border-border bg-background/80 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Resumen abstraido
+                </p>
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {meetingResult?.resumen ||
+                    "Aun no hay resultado. Pulsa 'Procesar' en la izquierda para generar resumen y vistas detalladas."}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  onClick={() => setIsTasksModalOpen(true)}
+                  disabled={!meetingResult}
+                  className="h-auto flex-col items-start gap-1 py-3"
+                  variant={meetingResult ? "default" : "secondary"}
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <CheckSquare className="h-4 w-4" />
+                    Tasks
+                  </span>
+                  <span className="text-xs opacity-85">
+                    {tasks.length} tareas detectadas
+                  </span>
+                </Button>
+
+                <Button
+                  onClick={() => setIsFlowModalOpen(true)}
+                  disabled={!meetingResult}
+                  className="h-auto flex-col items-start gap-1 py-3"
+                  variant={meetingResult ? "default" : "secondary"}
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <Network className="h-4 w-4" />
+                    Diagrama
+                  </span>
+                  <span className="text-xs opacity-85">Flujo accionable horizontal</span>
+                </Button>
+
+                <Button
+                  onClick={() => setIsGanttModalOpen(true)}
+                  disabled={!meetingResult}
+                  className="h-auto flex-col items-start gap-1 py-3"
+                  variant={meetingResult ? "default" : "secondary"}
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <CalendarRange className="h-4 w-4" />
+                    Gantt
+                  </span>
+                  <span className="text-xs opacity-85">Por usuarios y tareas</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
+
+      <Dialog open={isTasksModalOpen} onOpenChange={setIsTasksModalOpen}>
+        <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Tareas por usuario y tematica</DialogTitle>
+            <DialogDescription>
+              Agrupacion automatica por tema con color de usuario aleatorio.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 overflow-y-auto pr-1">
+            {groupedTasks.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No hay tareas para mostrar todavia.
+              </p>
+            )}
+            {groupedTasks.map((themeGroup) => (
+              <div
+                key={themeGroup.theme}
+                className="rounded-lg border border-border bg-background/80 p-4"
+              >
+                <h3 className="text-sm font-semibold text-foreground">{themeGroup.theme}</h3>
+                <div className="mt-3 space-y-3">
+                  {themeGroup.users.map((entry) => (
+                    <div key={`${themeGroup.theme}-${entry.user}`} className="space-y-2">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getUserColorClass(entry.user, userColorSeed)}`}
+                      >
+                        {entry.user}
+                      </span>
+                      <ul className="space-y-1.5">
+                        {entry.tasks.map((task, index) => (
+                          <li
+                            key={`${entry.user}-${task.descripcion}-${index}`}
+                            className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                          >
+                            {task.descripcion}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-purple-900">
-                        <strong>Personalización:</strong> ajusta detalle y enfoque — exporta con un
-                        clic
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-
-                {/* Header */}
-                <div className="px-6 pt-6 pb-4 border-b border-gray-200">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    {selectedFormat === "resumen"
-                      ? "Resumen"
-                      : selectedFormat === "esquema"
-                      ? "Esquema"
-                      : "Mapa conceptual"}{" "}
-                    ({detailLevel})
-                  </h2>
-                </div>
-
-                {/* Action Bar */}
-                {hasContent && (
-                  <div className="px-6">
-                    <ActionBar />
-                  </div>
-                )}
-
-                {/* Content */}
-                <div className="px-6 py-6">{renderContent()}</div>
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFlowModalOpen} onOpenChange={setIsFlowModalOpen}>
+        <DialogContent className="top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none">
+          <div className="flex h-full flex-col">
+            <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-foreground">
+                Diagrama de flujo accionable (horizontal)
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Vista completa de dependencias y secuencia de acciones.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto p-6">
+              <DiagramViewer
+                mermaidCode={horizontalFlowCode}
+                diagramType="flowchart"
+                fallbackItems={tasks.map(
+                  (task) => `${task.descripcion} (${task.responsable || "Sin asignar"})`,
+                )}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isGanttModalOpen} onOpenChange={setIsGanttModalOpen}>
+        <DialogContent className="top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none">
+          <div className="flex h-full flex-col">
+            <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
+              <DialogTitle className="text-lg font-semibold text-foreground">
+                Diagrama Gantt por usuarios y tareas
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Plan visual de ejecucion distribuido por responsables.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto p-6">
+              <DiagramViewer
+                mermaidCode={userGanttCode}
+                diagramType="gantt"
+                fallbackItems={tasks.map(
+                  (task) => `${task.responsable || "Sin asignar"} - ${task.descripcion}`,
+                )}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-
-

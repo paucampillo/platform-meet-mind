@@ -89,3 +89,17 @@ meetmind/
 ├── .env.example                  # Plantilla de variables de entorno
 └── package.json
 ```
+
+## Actualizaci�n Beta (Flujo IA de Reuniones)
+
+### Nuevo endpoint
+- `POST /api/process-meeting`
+- Entrada esperada: `{ "text": string, "audioMeta"?: object }`
+- Salida: `{ "success": true, "data": { "resumen": string, "tareas": [{ "descripcion": string, "responsable": string }], "mermaid_codigo": string } }`
+
+### Variables de entorno necesarias
+- `OPEN_ROUTER_API_KEY`: clave de OpenRouter para el endpoint `/api/process-meeting`.
+- `VITE_FORM_ENDPOINT`: endpoint del formulario usado por el modal de waitlist en frontend.
+
+### Dependencia nueva
+- `mermaid` (para renderizar `mermaid_codigo` en el componente `DiagramViewer`).

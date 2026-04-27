@@ -13,7 +13,7 @@ const getDefaultError = (status?: number) => {
     return "Endpoint API introuvable. Lance le projet avec `vercel dev` pour utiliser /api/* en local.";
   }
   if (status === 401 || status === 403) {
-    return "Accès refusé par Anthropic. Vérifie ANTHROPIC_API_KEY et les permissions de la clé.";
+    return "Accès refusé par le provider IA. Vérifie les variables d'environnement côté serveur.";
   }
   if (status === 429) {
     return "Limite de requêtes atteinte. Réessaie dans quelques instants.";
@@ -21,22 +21,58 @@ const getDefaultError = (status?: number) => {
   return "Erreur serveur pendant l'appel API.";
 };
 
+const getRequestCandidates = (url: string): string[] => {
+  const candidates = [url];
+
+  if (typeof window === "undefined" || !url.startsWith("/")) {
+    return candidates;
+  }
+
+  const isLocalHost =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+
+  if (!isLocalHost) {
+    return candidates;
+  }
+
+  candidates.push(`http://localhost:3000${url}`);
+  candidates.push(`http://127.0.0.1:3000${url}`);
+  return Array.from(new Set(candidates));
+};
+
 export async function postApiJson<T = any>(url: string, payload: unknown): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
+  const candidates = getRequestCandidates(url);
+  let response: Response | null = null;
+  let lastNetworkError: unknown = null;
+
+  for (const candidate of candidates) {
+    try {
+      response = await fetch(candidate, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      break;
+    } catch (error) {
+      lastNetworkError = error;
+    }
+  }
+
+  if (!response) {
+    const attempted = candidates.join(", ");
+    const reason =
+      lastNetworkError instanceof Error && lastNetworkError.message
+        ? ` (${lastNetworkError.message})`
+        : "";
     throw new ApiClientError(
-      "Impossible de joindre l'API. Vérifie que le serveur tourne (utilise `vercel dev` en local).",
+      `Impossible de joindre l'API. Vérifie que le serveur tourne (utilise \`vercel dev\` en local). Tentatives: ${attempted}${reason}`,
     );
   }
 
   const contentType = response.headers.get("content-type") || "";
   let data: any = null;
+
   if (contentType.includes("application/json")) {
     try {
       data = await response.json();
