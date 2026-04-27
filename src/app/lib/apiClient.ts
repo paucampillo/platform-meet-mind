@@ -10,7 +10,7 @@ export class ApiClientError extends Error {
 
 const getDefaultError = (status?: number) => {
   if (status === 404) {
-    return "Endpoint API introuvable. Lance le projet avec `vercel dev` pour utiliser /api/* en local.";
+    return "Endpoint API introuvable. Lance le projet avec `vercel dev` ou `netlify dev` pour utiliser /api/* en local.";
   }
   if (status === 401 || status === 403) {
     return "Accès refusé par le provider IA. Vérifie les variables d'environnement côté serveur.";
@@ -66,7 +66,7 @@ export async function postApiJson<T = any>(url: string, payload: unknown): Promi
         ? ` (${lastNetworkError.message})`
         : "";
     throw new ApiClientError(
-      `Impossible de joindre l'API. Vérifie que le serveur tourne (utilise \`vercel dev\` en local). Tentatives: ${attempted}${reason}`,
+      `Impossible de joindre l'API. Vérifie que le serveur tourne (utilise \`vercel dev\` ou \`netlify dev\` en local). Tentatives: ${attempted}${reason}`,
     );
   }
 
