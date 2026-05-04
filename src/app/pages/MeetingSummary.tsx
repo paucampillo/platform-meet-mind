@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Brain,
   CalendarRange,
@@ -7,6 +8,11 @@ import {
   Square,
   Network,
   Sparkles,
+  User,
+  Tag,
+  Zap,
+  TrendingUp,
+  ChevronRight,
 } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
@@ -38,6 +44,63 @@ const USER_COLOR_PALETTE = [
   "border-amber-200 bg-amber-100 text-amber-700",
   "border-indigo-200 bg-indigo-100 text-indigo-700",
   "border-fuchsia-200 bg-fuchsia-100 text-fuchsia-700",
+];
+
+const USER_DOT_COLORS = [
+  "bg-rose-400",
+  "bg-sky-400",
+  "bg-emerald-400",
+  "bg-amber-400",
+  "bg-indigo-400",
+  "bg-fuchsia-400",
+];
+
+const THEME_VISUAL_STYLES = [
+  {
+    gradient: "from-sky-50 to-blue-50",
+    border: "border-sky-200",
+    headerBg: "bg-gradient-to-r from-sky-500 to-blue-500",
+    badge: "bg-sky-100 text-sky-700 border-sky-200",
+    dot: "bg-sky-500",
+    glow: "shadow-sky-100",
+    taskBorder: "border-l-sky-400",
+  },
+  {
+    gradient: "from-emerald-50 to-green-50",
+    border: "border-emerald-200",
+    headerBg: "bg-gradient-to-r from-emerald-500 to-teal-500",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-500",
+    glow: "shadow-emerald-100",
+    taskBorder: "border-l-emerald-400",
+  },
+  {
+    gradient: "from-amber-50 to-orange-50",
+    border: "border-amber-200",
+    headerBg: "bg-gradient-to-r from-amber-500 to-orange-500",
+    badge: "bg-amber-100 text-amber-700 border-amber-200",
+    dot: "bg-amber-500",
+    glow: "shadow-amber-100",
+    taskBorder: "border-l-amber-400",
+  },
+  {
+    gradient: "from-fuchsia-50 to-pink-50",
+    border: "border-fuchsia-200",
+    headerBg: "bg-gradient-to-r from-fuchsia-500 to-pink-500",
+    badge: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+    dot: "bg-fuchsia-500",
+    glow: "shadow-fuchsia-100",
+    taskBorder: "border-l-fuchsia-400",
+  },
+  {
+    gradient: "from-violet-50 to-indigo-50",
+    border: "border-violet-200",
+    headerBg: "bg-gradient-to-r from-violet-500 to-indigo-500",
+    badge: "bg-violet-100 text-violet-700 border-violet-200",
+    dot: "bg-violet-500",
+    glow: "shadow-violet-100",
+    taskBorder: "border-l-violet-400",
+  },
 ];
 
 const THEME_RULES: Array<{ theme: string; keywords: string[] }> = [
@@ -218,14 +281,12 @@ const buildCrossDependencyFlow = (
     );
   });
 
-  // Sequential flow inside each theme.
   for (const taskIds of themeTaskIds.values()) {
     for (let index = 0; index < taskIds.length - 1; index += 1) {
       lines.push(`${taskIds[index]} --> ${taskIds[index + 1]}`);
     }
   }
 
-  // Cross dependencies by same owner (non-blocking dashed dependency).
   for (const taskIds of userTaskIds.values()) {
     if (taskIds.length < 2) continue;
     for (let index = 0; index < taskIds.length - 1; index += 1) {
@@ -237,7 +298,6 @@ const buildCrossDependencyFlow = (
   const enableKeywords = ["aprobar", "definir", "disenar", "document", "plan"];
   const executeKeywords = ["implementar", "programar", "migrar", "lanzar", "ejecut", "desplegar"];
 
-  // Cross dependencies by semantic enablement: approval/planning tasks enable execution tasks.
   taskRecords.forEach((targetTask) => {
     const targetDesc = lowerDescriptions[targetTask.index];
     const isExecutionTask = executeKeywords.some((keyword) => targetDesc.includes(keyword));
@@ -359,6 +419,11 @@ const getUserColorClass = (user: string, seed: number) => {
   return USER_COLOR_PALETTE[idx];
 };
 
+const getUserDotColor = (user: string, seed: number) => {
+  const idx = hashString(`${seed}-${user}`) % USER_DOT_COLORS.length;
+  return USER_DOT_COLORS[idx];
+};
+
 const shuffleArray = <T,>(items: T[]) => {
   const next = [...items];
   for (let index = next.length - 1; index > 0; index -= 1) {
@@ -373,68 +438,6 @@ const waitMs = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-const withFlowSimulationStyles = (
-  baseFlowCode: string,
-  activeNodeId: string | null,
-  completedNodeIds: string[],
-) => {
-  if (!baseFlowCode) return "";
-
-  const lines = baseFlowCode.split("\n");
-  const taskNodeIds = Array.from(
-    new Set(
-      lines
-        .map((line) => line.match(/^\s*(K\d+)\s*\[/)?.[1])
-        .filter((nodeId): nodeId is string => Boolean(nodeId)),
-    ),
-  );
-
-  const allNodeIds = ["NSTART", ...taskNodeIds, "NEND"];
-  const completedSet = new Set(completedNodeIds);
-
-  const classDefs = [
-    "classDef mmIdle fill:#f8fafc,stroke:#94a3b8,stroke-width:2px,color:#0f172a;",
-    "classDef mmQueued fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;",
-    "classDef mmDone fill:#dcfce7,stroke:#16a34a,stroke-width:3px,color:#14532d;",
-    "classDef mmActive fill:#fef3c7,stroke:#f59e0b,stroke-width:4px,color:#78350f,stroke-dasharray:10 6;",
-  ];
-
-  const classLines = allNodeIds.map((nodeId) => {
-    const className = completedSet.has(nodeId)
-      ? "mmDone"
-      : activeNodeId === nodeId
-        ? "mmActive"
-        : nodeId.startsWith("K")
-          ? "mmQueued"
-          : "mmIdle";
-
-    return `class ${nodeId} ${className}`;
-  });
-
-  const edgeLines = lines.filter((line) => /-->|-\.->/.test(line));
-  const linkStyles = edgeLines
-    .map((edgeLine, index) => {
-      const match = edgeLine.match(/^\s*([A-Za-z0-9_]+)\s+(-\.->|-->)\s+([A-Za-z0-9_]+)/);
-      if (!match) return `linkStyle ${index} stroke:#94a3b8,stroke-width:1.6px,opacity:0.45;`;
-
-      const fromNode = match[1];
-      const toNode = match[3];
-      const touchesActive =
-        activeNodeId != null && (fromNode === activeNodeId || toNode === activeNodeId);
-      const isCompletedEdge = completedSet.has(fromNode) && completedSet.has(toNode);
-
-      if (touchesActive) {
-        return `linkStyle ${index} stroke:#f59e0b,stroke-width:3px,opacity:1;`;
-      }
-      if (isCompletedEdge) {
-        return `linkStyle ${index} stroke:#16a34a,stroke-width:2.6px,opacity:0.95;`;
-      }
-      return `linkStyle ${index} stroke:#94a3b8,stroke-width:1.6px,opacity:0.45;`;
-    })
-    .filter(Boolean);
-
-  return [baseFlowCode, ...classDefs, ...classLines, ...linkStyles].join("\n");
-};
 
 export default function MeetingSummary() {
   const [meetingResult, setMeetingResult] = useState<MeetingProcessResult | null>(null);
@@ -477,21 +480,29 @@ export default function MeetingSummary() {
     });
     return labels;
   }, [tasks]);
-  const simulatedFlowCode = useMemo(
-    () =>
-      withFlowSimulationStyles(
-        horizontalFlowCode,
-        activeSimulationNodeId,
-        completedSimulationNodeIds,
-      ),
-    [activeSimulationNodeId, completedSimulationNodeIds, horizontalFlowCode],
+  const simulationState = useMemo(
+    () => ({ activeNodeId: activeSimulationNodeId, completedNodeIds: completedSimulationNodeIds }),
+    [activeSimulationNodeId, completedSimulationNodeIds],
   );
   const userGanttCode = useMemo(() => buildUserGantt(tasks), [tasks]);
+  const flowFallbackItems = useMemo(
+    () => tasks.map((task) => `${task.descripcion} (${task.responsable || "Sin asignar"})`),
+    [tasks],
+  );
+  const ganttFallbackItems = useMemo(
+    () => tasks.map((task) => `${task.responsable || "Sin asignar"} - ${task.descripcion}`),
+    [tasks],
+  );
   const totalFlowSteps = tasks.length + 2;
   const completedFlowSteps = completedSimulationNodeIds.length;
   const flowProgressPercent = Math.max(
     0,
     Math.min(100, Math.round((completedFlowSteps / Math.max(1, totalFlowSteps)) * 100)),
+  );
+
+  const uniqueUsers = useMemo(
+    () => new Set(tasks.map((t) => t.responsable?.trim() || "Sin asignar")).size,
+    [tasks],
   );
 
   const stopFlowSimulation = () => {
@@ -654,298 +665,612 @@ export default function MeetingSummary() {
                 </p>
               </div>
 
+              {/* Action cards – more visual */}
               <div className="grid gap-3 sm:grid-cols-3">
-                <Button
+                {/* Tasks card */}
+                <motion.button
+                  type="button"
+                  whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
+                  whileTap={meetingResult ? { scale: 0.97 } : {}}
                   onClick={() => {
+                    if (!meetingResult) return;
                     if (!selectedTaskDetail && firstTaskDetail) {
                       setSelectedTaskDetail(firstTaskDetail);
                     }
                     setIsTasksModalOpen(true);
                   }}
                   disabled={!meetingResult}
-                  className="h-auto flex-col items-start gap-1 py-3"
-                  variant={meetingResult ? "default" : "secondary"}
+                  className={`group relative overflow-hidden rounded-xl border-2 p-4 text-left transition-all duration-200 ${
+                    meetingResult
+                      ? "border-sky-200 bg-gradient-to-br from-sky-50 to-indigo-50 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-100 cursor-pointer"
+                      : "border-border bg-muted/30 cursor-not-allowed opacity-50"
+                  }`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <CheckSquare className="h-4 w-4" />
-                    Tasks
-                  </span>
-                  <span className="text-xs opacity-85">
-                    {tasks.length} tareas detectadas
-                  </span>
-                </Button>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 shadow-sm">
+                      <CheckSquare className="h-4 w-4 text-white" />
+                    </div>
+                    {tasks.length > 0 && (
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 border border-sky-200">
+                        {tasks.length}
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm text-foreground">Tasks</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{tasks.length} tareas detectadas</p>
+                  {meetingResult && (
+                    <ChevronRight className="absolute right-3 bottom-3 h-4 w-4 text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </motion.button>
 
-                <Button
-                  onClick={() => setIsFlowModalOpen(true)}
+                {/* Diagrama card */}
+                <motion.button
+                  type="button"
+                  whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
+                  whileTap={meetingResult ? { scale: 0.97 } : {}}
+                  onClick={() => { if (meetingResult) setIsFlowModalOpen(true); }}
                   disabled={!meetingResult}
-                  className="h-auto flex-col items-start gap-1 py-3"
-                  variant={meetingResult ? "default" : "secondary"}
+                  className={`group relative overflow-hidden rounded-xl border-2 p-4 text-left transition-all duration-200 ${
+                    meetingResult
+                      ? "border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-100 cursor-pointer"
+                      : "border-border bg-muted/30 cursor-not-allowed opacity-50"
+                  }`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <Network className="h-4 w-4" />
-                    Diagrama
-                  </span>
-                  <span className="text-xs opacity-85">Flujo accionable horizontal</span>
-                </Button>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-sm">
+                      <Network className="h-4 w-4 text-white" />
+                    </div>
+                    {isFlowSimulationRunning && (
+                      <motion.span
+                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200"
+                        animate={{ opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      >
+                        ▶
+                      </motion.span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm text-foreground">Diagrama</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Flujo accionable</p>
+                  {meetingResult && (
+                    <ChevronRight className="absolute right-3 bottom-3 h-4 w-4 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </motion.button>
 
-                <Button
-                  onClick={() => setIsGanttModalOpen(true)}
+                {/* Gantt card */}
+                <motion.button
+                  type="button"
+                  whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
+                  whileTap={meetingResult ? { scale: 0.97 } : {}}
+                  onClick={() => { if (meetingResult) setIsGanttModalOpen(true); }}
                   disabled={!meetingResult}
-                  className="h-auto flex-col items-start gap-1 py-3"
-                  variant={meetingResult ? "default" : "secondary"}
+                  className={`group relative overflow-hidden rounded-xl border-2 p-4 text-left transition-all duration-200 ${
+                    meetingResult
+                      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100 cursor-pointer"
+                      : "border-border bg-muted/30 cursor-not-allowed opacity-50"
+                  }`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <CalendarRange className="h-4 w-4" />
-                    Gantt
-                  </span>
-                  <span className="text-xs opacity-85">Por usuarios y tareas</span>
-                </Button>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 shadow-sm">
+                      <CalendarRange className="h-4 w-4 text-white" />
+                    </div>
+                    {uniqueUsers > 0 && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                        {uniqueUsers}p
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm text-foreground">Gantt</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Por usuarios y tareas</p>
+                  {meetingResult && (
+                    <ChevronRight className="absolute right-3 bottom-3 h-4 w-4 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </motion.button>
               </div>
             </CardContent>
           </Card>
         </section>
       </main>
 
+      {/* ── TASKS MODAL ──────────────────────────────────────────────── */}
       <Dialog open={isTasksModalOpen} onOpenChange={setIsTasksModalOpen}>
-        <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Tareas por usuario y tematica</DialogTitle>
-            <DialogDescription>
-              Agrupacion automatica por tema con color de usuario aleatorio.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid h-[68vh] gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-            <div className="space-y-4 overflow-y-auto pr-1">
-              {groupedTasks.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No hay tareas para mostrar todavia.
+        <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-5xl border-0 p-0 shadow-2xl rounded-2xl">
+          <DialogTitle className="sr-only">Tareas por usuario y tematica</DialogTitle>
+          <DialogDescription className="sr-only">Agrupacion automatica por tema con color de usuario aleatorio.</DialogDescription>
+          {/* Gradient header */}
+          <div className="bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+                <CheckSquare className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Tareas por usuario y tematica</h2>
+                <p className="text-sm text-white/75">
+                  {tasks.length} tareas · {uniqueUsers} personas · {groupedTasks.length} tematicas
                 </p>
-              )}
-              {groupedTasks.map((themeGroup) => (
-                <div
-                  key={themeGroup.theme}
-                  className="rounded-lg border border-border bg-background/80 p-4"
-                >
-                  <h3 className="text-sm font-semibold text-foreground">{themeGroup.theme}</h3>
-                  <div className="mt-3 space-y-3">
-                    {themeGroup.users.map((entry) => (
-                      <div key={`${themeGroup.theme}-${entry.user}`} className="space-y-2">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getUserColorClass(entry.user, userColorSeed)}`}
-                        >
-                          {entry.user}
-                        </span>
-                        <ul className="space-y-1.5">
-                          {entry.tasks.map((task, index) => {
-                            const isSelected =
-                              selectedTaskDetail?.task.descripcion === task.descripcion &&
-                              selectedTaskDetail?.user === entry.user &&
-                              selectedTaskDetail?.theme === themeGroup.theme;
+              </div>
+            </div>
+          </div>
 
-                            return (
-                              <li key={`${entry.user}-${task.descripcion}-${index}`}>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setSelectedTaskDetail({
-                                      task,
-                                      theme: themeGroup.theme,
-                                      user: entry.user,
-                                    })
-                                  }
-                                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                                    isSelected
-                                      ? "border-primary bg-primary/10 text-foreground"
-                                      : "border-border bg-card text-foreground hover:border-primary/50"
-                                  }`}
-                                >
-                                  {task.descripcion}
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    ))}
+          <div className="grid h-[68vh] gap-4 p-5 lg:grid-cols-[1.3fr_0.7fr] overflow-hidden">
+            {/* Left: task groups */}
+            <div className="space-y-3 overflow-y-auto pr-1">
+              {groupedTasks.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                    <CheckSquare className="h-6 w-6 text-muted-foreground" />
                   </div>
+                  <p className="text-sm text-muted-foreground">No hay tareas para mostrar.</p>
                 </div>
-              ))}
+              )}
+              <AnimatePresence>
+                {groupedTasks.map((themeGroup, themeIndex) => {
+                  const style = THEME_VISUAL_STYLES[themeIndex % THEME_VISUAL_STYLES.length];
+                  const totalTasksInGroup = themeGroup.users.reduce(
+                    (sum, u) => sum + u.tasks.length,
+                    0,
+                  );
+                  return (
+                    <motion.div
+                      key={themeGroup.theme}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: themeIndex * 0.06 }}
+                      className={`overflow-hidden rounded-xl border-2 shadow-sm ${style.border} ${style.glow}`}
+                    >
+                      {/* Theme header */}
+                      <div className={`${style.headerBg} px-4 py-3 flex items-center justify-between`}>
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-white/90" />
+                          <h3 className="text-sm font-bold text-white">{themeGroup.theme}</h3>
+                        </div>
+                        <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">
+                          {totalTasksInGroup} tarea{totalTasksInGroup !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {/* Theme body */}
+                      <div className={`bg-gradient-to-br ${style.gradient} p-4 space-y-4`}>
+                        {themeGroup.users.map((entry) => (
+                          <div key={`${themeGroup.theme}-${entry.user}`} className="space-y-2">
+                            {/* User row */}
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold border ${getUserColorClass(entry.user, userColorSeed)}`}
+                              >
+                                {entry.user.charAt(0).toUpperCase()}
+                              </div>
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getUserColorClass(entry.user, userColorSeed)}`}
+                              >
+                                {entry.user}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {entry.tasks.length} tarea{entry.tasks.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+
+                            {/* Task list */}
+                            <ul className="space-y-1.5 pl-8">
+                              {entry.tasks.map((task, taskIndex) => {
+                                const isSelected =
+                                  selectedTaskDetail?.task.descripcion === task.descripcion &&
+                                  selectedTaskDetail?.user === entry.user &&
+                                  selectedTaskDetail?.theme === themeGroup.theme;
+
+                                return (
+                                  <motion.li
+                                    key={`${entry.user}-${task.descripcion}-${taskIndex}`}
+                                    initial={{ opacity: 0, x: -8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.2, delay: taskIndex * 0.04 }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setSelectedTaskDetail({
+                                          task,
+                                          theme: themeGroup.theme,
+                                          user: entry.user,
+                                        })
+                                      }
+                                      className={`group w-full rounded-lg border-l-4 px-3 py-2.5 text-left text-sm transition-all duration-150 ${
+                                        isSelected
+                                          ? `${style.taskBorder} border-t border-r border-b border-primary/20 bg-white shadow-md`
+                                          : `${style.taskBorder} border-t border-r border-b border-border/60 bg-white/70 hover:bg-white hover:shadow-sm`
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <div
+                                          className={`mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full ${style.dot}`}
+                                        />
+                                        <span
+                                          className={`text-xs leading-relaxed ${
+                                            isSelected ? "font-semibold text-foreground" : "text-foreground/80"
+                                          }`}
+                                        >
+                                          {task.descripcion}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  </motion.li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
 
-            <aside className="rounded-lg border border-border bg-background/80 p-4">
-              {selectedTaskDetail ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Detalle de tarea
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-foreground">
-                      {selectedTaskDetail.task.descripcion}
-                    </p>
-                  </div>
+            {/* Right: task detail panel */}
+            <aside className="overflow-y-auto rounded-xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+              <AnimatePresence mode="wait">
+                {selectedTaskDetail ? (
+                  <motion.div
+                    key={selectedTaskDetail.task.descripcion}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -12 }}
+                    transition={{ duration: 0.2 }}
+                    className="p-5 space-y-4 flex-1"
+                  >
+                    {/* Task description card */}
+                    <div className="rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-4">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                          Tarea seleccionada
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        {selectedTaskDetail.task.descripcion}
+                      </p>
+                    </div>
 
-                  <div className="space-y-2 text-sm">
-                    <p>
-                      <span className="font-semibold text-foreground">Responsable:</span>{" "}
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${getUserColorClass(selectedTaskDetail.user, userColorSeed)}`}
-                      >
-                        {selectedTaskDetail.user}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="font-semibold text-foreground">Tematica:</span>{" "}
-                      <span className="text-foreground/90">{selectedTaskDetail.theme}</span>
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Relacionadas por responsable
-                    </p>
-                    {relatedBySameOwner.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No hay relacionadas.</p>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {relatedBySameOwner.map((task, index) => (
-                          <li
-                            key={`owner-${task.descripcion}-${index}`}
-                            className="rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground"
+                    {/* Meta */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                        <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground flex-shrink-0">Responsable</span>
+                        <div className="ml-auto flex items-center gap-1.5">
+                          <div
+                            className={`h-2 w-2 rounded-full ${getUserDotColor(selectedTaskDetail.user, userColorSeed)}`}
+                          />
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${getUserColorClass(selectedTaskDetail.user, userColorSeed)}`}
                           >
-                            {task.descripcion}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                            {selectedTaskDetail.user}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                        <Tag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground flex-shrink-0">Tematica</span>
+                        <span className="ml-auto text-xs font-medium text-foreground text-right">
+                          {selectedTaskDetail.theme}
+                        </span>
+                      </div>
+                    </div>
 
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Relacionadas por tematica
-                    </p>
-                    {relatedBySameTheme.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No hay relacionadas.</p>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {relatedBySameTheme.map((task, index) => (
-                          <li
-                            key={`theme-${task.descripcion}-${index}`}
-                            className="rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground"
-                          >
-                            {task.descripcion}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Haz click en una tarea para ver su informacion.
-                </p>
-              )}
+                    {/* Related by owner */}
+                    <div>
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        Mismo responsable
+                      </p>
+                      {relatedBySameOwner.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No hay relacionadas.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {relatedBySameOwner.map((task, index) => (
+                            <motion.li
+                              key={`owner-${task.descripcion}-${index}`}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="rounded-lg border border-border/60 bg-card px-2.5 py-2 text-xs text-foreground/80 hover:bg-muted/40 transition-colors cursor-pointer"
+                              onClick={() =>
+                                setSelectedTaskDetail({
+                                  task,
+                                  theme: detectTheme(task.descripcion || ""),
+                                  user: task.responsable?.trim() || "Sin asignar",
+                                })
+                              }
+                            >
+                              {task.descripcion}
+                            </motion.li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Related by theme */}
+                    <div>
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <Tag className="h-3 w-3" />
+                        Misma tematica
+                      </p>
+                      {relatedBySameTheme.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No hay relacionadas.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {relatedBySameTheme.map((task, index) => (
+                            <motion.li
+                              key={`theme-${task.descripcion}-${index}`}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="rounded-lg border border-border/60 bg-card px-2.5 py-2 text-xs text-foreground/80 hover:bg-muted/40 transition-colors cursor-pointer"
+                              onClick={() =>
+                                setSelectedTaskDetail({
+                                  task,
+                                  theme: detectTheme(task.descripcion || ""),
+                                  user: task.responsable?.trim() || "Sin asignar",
+                                })
+                              }
+                            >
+                              {task.descripcion}
+                            </motion.li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center"
+                  >
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20">
+                      <CheckSquare className="h-7 w-7 text-primary/50" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground/70">Selecciona una tarea</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Haz clic en cualquier tarea para ver sus detalles y relaciones.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </aside>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* ── DIAGRAM MODAL ────────────────────────────────────────────── */}
       <Dialog open={isFlowModalOpen} onOpenChange={handleFlowModalOpenChange}>
         <DialogContent className="!inset-0 !top-0 !left-0 !h-[100dvh] !w-[100vw] !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:!max-w-none">
+          <DialogTitle className="sr-only">Diagrama de flujo accionable</DialogTitle>
+          <DialogDescription className="sr-only">Vista completa de dependencias y secuencia de acciones.</DialogDescription>
           <div className="flex h-full flex-col">
-            <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
-              <DialogTitle className="text-lg font-semibold text-foreground">
-                Diagrama de flujo accionable (horizontal)
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Vista completa de dependencias y secuencia de acciones.
-              </DialogDescription>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={handleToggleFlowSimulation}
-                  disabled={tasks.length === 0}
-                  className="h-8 px-3"
-                  variant={isFlowSimulationRunning ? "destructive" : "default"}
-                >
-                  {isFlowSimulationRunning ? (
-                    <>
-                      <Square className="mr-2 h-3.5 w-3.5" />
-                      Detener
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-3.5 w-3.5" />
-                      Play
-                    </>
+            {/* Diagram header */}
+            <div className="border-b border-border bg-gradient-to-r from-violet-50/70 via-background to-background px-6 py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-sm">
+                  <Network className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Diagrama de flujo accionable</h2>
+                  <p className="text-xs text-muted-foreground">Vista completa de dependencias y secuencia de acciones</p>
+                </div>
+              </div>
+
+              {/* Simulation controls */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Big Play/Stop button */}
+                <div className="relative">
+                  <motion.button
+                    type="button"
+                    onClick={handleToggleFlowSimulation}
+                    disabled={tasks.length === 0}
+                    className={`relative flex items-center gap-2.5 overflow-hidden rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isFlowSimulationRunning
+                        ? "bg-gradient-to-r from-rose-500 to-red-500 shadow-rose-200"
+                        : "bg-gradient-to-r from-indigo-500 to-violet-500 shadow-indigo-200"
+                    }`}
+                    whileHover={tasks.length > 0 ? { scale: 1.04 } : {}}
+                    whileTap={tasks.length > 0 ? { scale: 0.96 } : {}}
+                  >
+                    {/* Shimmer overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full animate-[shimmer_3s_ease_infinite]" />
+
+                    {/* Pulsing border ring when idle */}
+                    {!isFlowSimulationRunning && tasks.length > 0 && (
+                      <motion.span
+                        className="absolute inset-0 rounded-xl border-2 border-indigo-300"
+                        animate={{ scale: [1, 1.12, 1], opacity: [0.8, 0, 0.8] }}
+                        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                    )}
+
+                    {/* Recording dot when running */}
+                    {isFlowSimulationRunning && (
+                      <motion.span
+                        className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-white"
+                        animate={{ opacity: [1, 0.2, 1] }}
+                        transition={{ duration: 0.9, repeat: Infinity }}
+                      />
+                    )}
+
+                    {isFlowSimulationRunning ? (
+                      <>
+                        <Square className="h-4 w-4 fill-white flex-shrink-0" />
+                        Detener simulacion
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 fill-white flex-shrink-0" />
+                        Simular flujo
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+
+                {/* Status badge */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={isFlowSimulationRunning ? "running" : "idle"}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={{ duration: 0.18 }}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      isFlowSimulationRunning
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    }`}
+                  >
+                    <motion.span
+                      className={`h-2 w-2 rounded-full ${isFlowSimulationRunning ? "bg-amber-500" : "bg-emerald-500"}`}
+                      animate={isFlowSimulationRunning ? { scale: [1, 1.5, 1] } : {}}
+                      transition={{ duration: 0.9, repeat: Infinity }}
+                    />
+                    {isFlowSimulationRunning ? "En ejecucion" : "En pausa"}
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Active task chip */}
+                <AnimatePresence>
+                  {activeSimulationNodeId && (
+                    <motion.div
+                      initial={{ opacity: 0, x: 10, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -10, scale: 0.9 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-800 max-w-[220px]"
+                    >
+                      <Zap className="h-3 w-3 flex-shrink-0 text-amber-500" />
+                      <span className="truncate">
+                        {taskLabelByNodeId.get(activeSimulationNodeId) || activeSimulationNodeId}
+                      </span>
+                    </motion.div>
                   )}
-                </Button>
-                <Badge
-                  className={
-                    isFlowSimulationRunning
-                      ? "border-amber-200 bg-amber-100 text-amber-800"
-                      : "border-emerald-200 bg-emerald-100 text-emerald-800"
-                  }
-                >
-                  {isFlowSimulationRunning ? "En ejecucion" : "En pausa"}
-                </Badge>
-                {activeSimulationNodeId && (
-                  <Badge className="border-primary/30 bg-primary/10 text-primary">
-                    {taskLabelByNodeId.get(activeSimulationNodeId) || activeSimulationNodeId}
-                  </Badge>
-                )}
-                {lastStepDurationMs && (
+                </AnimatePresence>
+
+                {/* Step timer */}
+                {lastStepDurationMs && isFlowSimulationRunning && (
                   <span className="text-xs text-muted-foreground">
-                    Paso: {(lastStepDurationMs / 1000).toFixed(1)}s
+                    ~{(lastStepDurationMs / 1000).toFixed(1)}s por paso
                   </span>
                 )}
-                <div className="ml-auto flex min-w-[220px] items-center gap-2">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500 transition-all duration-500 ${
-                        isFlowSimulationRunning ? "animate-pulse" : ""
-                      }`}
-                      style={{ width: `${flowProgressPercent}%` }}
+
+                {/* Progress bar */}
+                <div className="ml-auto flex min-w-[200px] items-center gap-2">
+                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500"
+                      animate={{ width: `${flowProgressPercent}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
                     />
+                    {isFlowSimulationRunning && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_1.8s_ease_infinite]" />
+                    )}
                   </div>
-                  <span className="min-w-10 text-right text-xs text-muted-foreground">
+                  <span className="min-w-10 text-right text-xs font-medium text-muted-foreground">
                     {flowProgressPercent}%
                   </span>
                 </div>
               </div>
-            </DialogHeader>
-            <div className="flex-1 min-h-0 p-0">
+
+              {/* Simulation legend */}
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                {[
+                  { label: "Inactivo", colorClass: "bg-slate-300", border: "border-slate-300" },
+                  { label: "En cola", colorClass: "bg-blue-400", border: "border-blue-300" },
+                  { label: "Activo", colorClass: "bg-amber-400", border: "border-amber-300" },
+                  { label: "Completado", colorClass: "bg-emerald-400", border: "border-emerald-300" },
+                ].map(({ label, colorClass, border }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <div className={`h-2.5 w-2.5 rounded-sm ${colorClass} border ${border}`} />
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+                {completedFlowSteps > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {completedFlowSteps} / {totalFlowSteps} pasos
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Diagram canvas */}
+            <div className="min-h-0 flex-1 p-0">
               <DiagramViewer
-                mermaidCode={simulatedFlowCode}
+                mermaidCode={horizontalFlowCode}
+                simulation={simulationState}
                 diagramType="flowchart"
                 defaultZoom={0.75}
-                fallbackItems={tasks.map(
-                  (task) => `${task.descripcion} (${task.responsable || "Sin asignar"})`,
-                )}
+                fallbackItems={flowFallbackItems}
               />
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* ── GANTT MODAL ──────────────────────────────────────────────── */}
       <Dialog open={isGanttModalOpen} onOpenChange={setIsGanttModalOpen}>
         <DialogContent className="!inset-0 !top-0 !left-0 !h-[100dvh] !w-[100vw] !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:!max-w-none">
+          <DialogTitle className="sr-only">Diagrama Gantt por usuarios y tareas</DialogTitle>
+          <DialogDescription className="sr-only">Plan visual de ejecucion distribuido por responsables.</DialogDescription>
           <div className="flex h-full flex-col">
-            <DialogHeader className="gap-1 border-b border-border px-6 py-4 text-left">
-              <DialogTitle className="text-lg font-semibold text-foreground">
-                Diagrama Gantt por usuarios y tareas
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Plan visual de ejecucion distribuido por responsables.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 min-h-0 p-0">
+            {/* Gantt header */}
+            <div className="border-b border-border bg-gradient-to-r from-emerald-50/70 via-background to-background px-6 py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-sm">
+                  <CalendarRange className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Diagrama Gantt por usuarios y tareas</h2>
+                  <p className="text-xs text-muted-foreground">Plan visual de ejecucion distribuido por responsables</p>
+                </div>
+              </div>
+
+              {/* Stats + legend row */}
+              <div className="flex flex-wrap items-center gap-3">
+                {tasks.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700">
+                      <CheckSquare className="h-3 w-3" />
+                      {tasks.length} tareas
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700">
+                      <User className="h-3 w-3" />
+                      {uniqueUsers} persona{uniqueUsers !== 1 ? "s" : ""}
+                    </div>
+                  </>
+                )}
+
+                <div className="ml-auto flex flex-wrap items-center gap-4">
+                  {[
+                    { label: "Activa", colorClass: "bg-indigo-500" },
+                    { label: "Critica", colorClass: "bg-rose-500" },
+                    { label: "Completada", colorClass: "bg-slate-400" },
+                    { label: "Pendiente", colorClass: "bg-sky-400" },
+                  ].map(({ label, colorClass }) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <div className={`h-2.5 w-4 rounded-sm ${colorClass}`} />
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Gantt canvas */}
+            <div className="min-h-0 flex-1 p-0">
               <DiagramViewer
                 mermaidCode={userGanttCode}
                 diagramType="gantt"
                 defaultZoom={1}
-                fallbackItems={tasks.map(
-                  (task) => `${task.responsable || "Sin asignar"} - ${task.descripcion}`,
-                )}
+                fallbackItems={ganttFallbackItems}
               />
             </div>
           </div>

@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } from "react";
 
 type DiagramType = "flowchart" | "gantt";
+
+interface SimulationState {
+  activeNodeId: string | null;
+  completedNodeIds: string[];
+}
 
 interface DiagramViewerProps {
   mermaidCode: string;
   fallbackItems?: string[];
   diagramType?: DiagramType;
   defaultZoom?: number;
+  simulation?: SimulationState;
 }
 
 const readCssVar = (
@@ -266,11 +272,220 @@ const buildCandidateSources = (
   return Array.from(new Set([normalized, fallback])).filter(Boolean);
 };
 
+// ── SVG post-render enhancements ──────────────────────────────────────────────
+const postEnhanceSvg = (svg: SVGSVGElement, diagramType: DiagramType) => {
+  // 1. Round node rect corners (Mermaid sets rx=0 on some themes)
+  svg.querySelectorAll<SVGRectElement>(".node rect").forEach((rect) => {
+    const rx = parseFloat(rect.getAttribute("rx") || "0");
+    if (rx < 8) {
+      rect.setAttribute("rx", "12");
+      rect.setAttribute("ry", "12");
+    }
+  });
+
+  // 2. Round gantt task bars
+  svg.querySelectorAll<SVGRectElement>(".task, .task0, .task1, .task2, .activetask, .donetask, .crittask").forEach((rect) => {
+    rect.setAttribute("rx", "6");
+    rect.setAttribute("ry", "6");
+  });
+
+  // 3. Inject shadow filter def + gradient fills (flowchart nodes only)
+  let defs = svg.querySelector("defs");
+  if (!defs) {
+    defs = document.createElementNS("http://www.w3.org/2000/svg", "defs") as SVGDefsElement;
+    svg.insertBefore(defs, svg.firstChild);
+  }
+
+  // Shadow filter
+  if (!defs.querySelector("#mmShadow")) {
+    const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    filter.setAttribute("id", "mmShadow");
+    filter.setAttribute("x", "-15%");
+    filter.setAttribute("y", "-15%");
+    filter.setAttribute("width", "130%");
+    filter.setAttribute("height", "140%");
+    filter.innerHTML = `
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1e1b4b" flood-opacity="0.09"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#1e1b4b" flood-opacity="0.06"/>
+    `;
+    defs.appendChild(filter);
+
+    svg.querySelectorAll<SVGGElement>(".node").forEach((g) => {
+      if (!g.getAttribute("filter")) g.setAttribute("filter", "url(#mmShadow)");
+    });
+
+    // Tag each node group with its logical node ID for simulation CSS targeting
+    svg.querySelectorAll<SVGGElement>(".node").forEach((g) => {
+      const id = g.getAttribute("id") ?? "";
+      // Mermaid IDs format: {diagramId}-{nodeId}-{index}, e.g. meetmind-mermaid-abc-K1-0
+      const match = id.match(/-([A-Za-z][A-Za-z0-9]*)-\d+$/);
+      if (match?.[1]) g.setAttribute("data-mm-id", match[1]);
+    });
+  }
+
+  // Gradient fills on flowchart nodes (only when not overridden by classDef simulation styles)
+  if (diagramType === "flowchart") {
+    const gradMap = new Map<string, string>();
+    let gi = 0;
+
+    svg.querySelectorAll<SVGElement>(".node rect, .node polygon").forEach((shape) => {
+      const fill = shape.getAttribute("fill");
+      if (!fill || fill === "none" || fill.startsWith("url(")) return;
+      // Skip near-white/white fills (start/end nodes or background)
+      if (fill === "#ffffff" || fill === "white" || /^#f[ef][f][ef][f][ef]$/i.test(fill)) return;
+
+      if (!gradMap.has(fill)) {
+        const id = `mmG${gi++}`;
+        gradMap.set(fill, id);
+        const lg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        lg.setAttribute("id", id);
+        lg.setAttribute("x1", "0%"); lg.setAttribute("y1", "0%");
+        lg.setAttribute("x2", "0%"); lg.setAttribute("y2", "100%");
+        const s1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s1.setAttribute("offset", "0%");
+        s1.setAttribute("stop-color", fill);
+        s1.setAttribute("stop-opacity", "0.65");
+        const s2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s2.setAttribute("offset", "100%");
+        s2.setAttribute("stop-color", fill);
+        s2.setAttribute("stop-opacity", "1");
+        lg.append(s1, s2);
+        defs!.appendChild(lg);
+      }
+      shape.setAttribute("fill", `url(#${gradMap.get(fill)!})`);
+    });
+  }
+
+  // 4. Gradient fills on gantt task bars for extra polish
+  if (diagramType === "gantt") {
+    const taskGradMap = new Map<string, string>();
+    let tgi = 0;
+
+    svg.querySelectorAll<SVGRectElement>(".task, .task0, .task1, .task2, .activetask, .donetask, .crittask").forEach((rect) => {
+      const fill = rect.getAttribute("fill") || rect.style.fill;
+      if (!fill || fill === "none" || fill.startsWith("url(")) return;
+
+      if (!taskGradMap.has(fill)) {
+        const id = `mmTG${tgi++}`;
+        taskGradMap.set(fill, id);
+        const lg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        lg.setAttribute("id", id);
+        lg.setAttribute("x1", "0%"); lg.setAttribute("y1", "0%");
+        lg.setAttribute("x2", "0%"); lg.setAttribute("y2", "100%");
+        const s1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s1.setAttribute("offset", "0%");
+        s1.setAttribute("stop-color", fill);
+        s1.setAttribute("stop-opacity", "0.8");
+        const s2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s2.setAttribute("offset", "100%");
+        s2.setAttribute("stop-color", fill);
+        s2.setAttribute("stop-opacity", "1");
+        lg.append(s1, s2);
+        defs!.appendChild(lg);
+      }
+      rect.setAttribute("fill", `url(#${taskGradMap.get(fill)!})`);
+    });
+  }
+};
+
+const buildSvgStyles = () => `
+  /* ── Base font ── */
+  svg {
+    font-family: 'Manrope', 'Nunito Sans', 'Segoe UI', sans-serif !important;
+    overflow: visible;
+  }
+
+  /* ── Keyframes (applied imperatively via inline styles, not via selectors) ── */
+  @keyframes mmNodeLight {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes mmEdgeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes mmPulseNode {
+    0%   { filter: drop-shadow(0 0 10px rgba(245,158,11,0.75)); }
+    50%  { filter: drop-shadow(0 0 18px rgba(245,158,11,0.95)); }
+    100% { filter: drop-shadow(0 0 10px rgba(245,158,11,0.75)); }
+  }
+  @keyframes mmQueueBlink {
+    0%, 100% { opacity: 0.65; }
+    50%       { opacity: 1; }
+  }
+  .edgePath path {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ── Node shapes base ── */
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path:not(.arrowMarkerPath) {
+    transition: fill 350ms ease, stroke 350ms ease, stroke-width 350ms ease, filter 350ms ease;
+  }
+
+  /* ── Node labels ── */
+  .node .label,
+  .node text,
+  .nodeLabel,
+  foreignObject div {
+    font-family: 'Manrope', 'Nunito Sans', 'Segoe UI', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Edge paths ── */
+  .edgePath path {
+    transition: stroke 300ms ease, stroke-width 300ms ease, opacity 280ms ease;
+  }
+
+  /* ── Arrowhead markers ── */
+  marker path, marker polygon {
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  /* ── Cluster labels ── */
+  .cluster rect {
+    stroke-dasharray: none !important;
+  }
+  .cluster .label {
+    font-family: 'Manrope', 'Nunito Sans', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* ── Gantt task text ── */
+  .taskText, .taskTextOutsideRight, .taskTextOutsideLeft {
+    font-family: 'Manrope', 'Nunito Sans', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+  }
+  .sectionTitle {
+    font-family: 'Manrope', 'Nunito Sans', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Gantt grid lines: subtle ── */
+  .grid .tick line {
+    stroke: rgba(100, 116, 139, 0.12) !important;
+  }
+
+`;
+
 export function DiagramViewer({
   mermaidCode,
   fallbackItems = [],
   diagramType = "flowchart",
   defaultZoom = 1,
+  simulation,
 }: DiagramViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -383,6 +598,63 @@ export function DiagramViewer({
     setPan({ x: 0, y: 0 });
   };
 
+  // Apply simulation styles directly on SVG elements — never touch <style> tags
+  // to avoid triggering CSS animation restarts on unrelated nodes.
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const svg = containerRef.current.querySelector("svg");
+    if (!svg) return;
+
+    const activeId = simulation?.activeNodeId ?? null;
+    const completedSet = new Set(simulation?.completedNodeIds ?? []);
+    const simActive = activeId !== null || completedSet.size > 0;
+
+    svg.querySelectorAll<SVGGElement>("g[data-mm-id]").forEach((g) => {
+      const id = g.getAttribute("data-mm-id") ?? "";
+      const shapes = g.querySelectorAll<SVGElement>("rect, polygon, circle, ellipse");
+
+      if (completedSet.has(id)) {
+        shapes.forEach((s) => {
+          s.style.fill = "#dcfce7";
+          s.style.stroke = "#16a34a";
+          s.style.strokeWidth = "3px";
+          s.style.filter = "drop-shadow(0 0 6px rgba(22,163,74,0.55))";
+          s.style.animation = "";
+          s.style.strokeDasharray = "";
+        });
+      } else if (id === activeId) {
+        shapes.forEach((s) => {
+          s.style.fill = "#fef3c7";
+          s.style.stroke = "#f59e0b";
+          s.style.strokeWidth = "4px";
+          s.style.strokeDasharray = "10 6";
+          s.style.filter = "drop-shadow(0 0 10px rgba(245,158,11,0.75))";
+          s.style.animation = "mmPulseNode 750ms ease-in-out infinite";
+          s.style.transformBox = "fill-box";
+          s.style.transformOrigin = "center";
+        });
+      } else if (simActive && (id.startsWith("K") || id === "NSTART" || id === "NEND")) {
+        shapes.forEach((s) => {
+          s.style.fill = "#dbeafe";
+          s.style.stroke = "#3b82f6";
+          s.style.strokeWidth = "2px";
+          s.style.filter = "";
+          s.style.animation = "mmQueueBlink 2.4s ease-in-out infinite";
+          s.style.strokeDasharray = "";
+        });
+      } else {
+        shapes.forEach((s) => {
+          s.style.fill = "";
+          s.style.stroke = "";
+          s.style.strokeWidth = "";
+          s.style.filter = "";
+          s.style.animation = "";
+          s.style.strokeDasharray = "";
+        });
+      }
+    });
+  }, [simulation]);
+
   const renderViewport = (content: ReactNode, className: string) => (
     <div
       ref={viewportRef}
@@ -407,35 +679,39 @@ export function DiagramViewer({
   );
 
   const zoomControls = (
-    <div className="flex items-center justify-end gap-1.5">
-      <button
-        type="button"
-        onClick={() => setZoom((prev) => clampZoom(prev - 0.15))}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted"
-        aria-label="Alejar diagrama"
-      >
-        -
-      </button>
-      <span className="min-w-14 text-center text-xs text-muted-foreground">
-        {Math.round(zoom * 100)}%
-      </span>
-      <button
-        type="button"
-        onClick={() => setZoom((prev) => clampZoom(prev + 0.15))}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted"
-        aria-label="Acercar diagrama"
-      >
-        +
-      </button>
+    <div className="flex items-center justify-end gap-2 px-3 py-2">
+      <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/80 p-0.5 shadow-sm backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => setZoom((prev) => clampZoom(prev - 0.15))}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Alejar diagrama"
+        >
+          −
+        </button>
+        <span className="min-w-12 text-center text-xs font-semibold text-foreground/70">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={() => setZoom((prev) => clampZoom(prev + 0.15))}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Acercar diagrama"
+        >
+          +
+        </button>
+      </div>
       <button
         type="button"
         onClick={resetView}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted"
+        className="rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-sm backdrop-blur-sm"
         aria-label="Restablecer vista"
       >
         Reset
       </button>
-      <span className="ml-2 text-[11px] text-muted-foreground">Arrastra para mover | Ctrl+rueda para zoom</span>
+      <span className="text-[11px] text-muted-foreground/60">
+        Arrastra · Ctrl+rueda zoom
+      </span>
     </div>
   );
 
@@ -464,35 +740,26 @@ export function DiagramViewer({
               renderedSvg.style.height = `${viewBox.height}px`;
             }
 
-            if (!renderedSvg.querySelector("style[data-meetmind-flowfx]")) {
-              const flowFxStyle = document.createElementNS("http://www.w3.org/2000/svg", "style");
-              flowFxStyle.setAttribute("data-meetmind-flowfx", "true");
-              flowFxStyle.textContent = `
-                .node rect, .node path { transition: all 420ms ease; }
-                .edgePath path { transition: stroke 360ms ease, stroke-width 360ms ease, opacity 300ms ease; }
-                .mmActive rect, .mmActive path {
-                  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.65));
-                  animation: mmPulseNode 900ms ease-in-out infinite;
-                }
-                .mmDone rect, .mmDone path {
-                  filter: drop-shadow(0 0 6px rgba(22, 163, 74, 0.35));
-                }
-                .edgePath path[style*="#f59e0b"] {
-                  stroke-dasharray: 10 6;
-                  animation: mmDashEdge 900ms linear infinite;
-                }
-                @keyframes mmPulseNode {
-                  0% { transform: scale(1); opacity: 0.9; }
-                  50% { transform: scale(1.035); opacity: 1; }
-                  100% { transform: scale(1); opacity: 0.9; }
-                }
-                @keyframes mmDashEdge {
-                  from { stroke-dashoffset: 20; }
-                  to { stroke-dashoffset: 0; }
-                }
-              `;
-              renderedSvg.prepend(flowFxStyle);
+            // ── Post-render visual enhancements ──────────────────────
+            postEnhanceSvg(renderedSvg, diagramType);
+
+            if (!renderedSvg.querySelector("style[data-meetmind-styles]")) {
+              const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+              style.setAttribute("data-meetmind-styles", "true");
+              style.textContent = buildSvgStyles();
+              renderedSvg.prepend(style);
             }
+
+            // ── Apply entrance animations imperatively (inline styles are immune
+            //    to <style> mutations from simulationOverlayCss updates) ──────────
+            renderedSvg.querySelectorAll<SVGGElement>(".node").forEach((node, i) => {
+              node.style.opacity = "0";
+              node.style.animation = `mmNodeLight 400ms ease-out ${i * 80}ms both`;
+            });
+            renderedSvg.querySelectorAll<SVGGElement>(".edgePath").forEach((edge) => {
+              edge.style.opacity = "0";
+              edge.style.animation = "mmEdgeIn 500ms ease-out 200ms both";
+            });
           }
           setErrorMessage(null);
           return true;
@@ -541,29 +808,36 @@ export function DiagramViewer({
             securityLevel: "loose",
             theme: "base",
             themeVariables: {
+              // ── General ──
               background,
-              primaryColor: primary,
-              primaryTextColor: foreground,
-              primaryBorderColor: border,
-              lineColor: foreground,
-              secondaryColor: muted,
-              tertiaryColor: background,
+              primaryColor: "#6366f1",
+              primaryTextColor: "#ffffff",
+              primaryBorderColor: "#4f46e5",
+              lineColor: "#64748b",
+              secondaryColor: "#f1f5f9",
+              tertiaryColor: "#f8fafc",
               textColor: foreground,
-              sectionBkgColor: muted,
-              sectionBkgColor2: background,
-              sectionTextColor: foreground,
-              gridColor: border,
-              taskBkgColor: primary,
-              taskBorderColor: border,
-              taskTextColor: foreground,
-              activeTaskBkgColor: ring,
-              activeTaskBorderColor: ring,
-              doneTaskBkgColor: muted,
-              doneTaskBorderColor: border,
-              critBkgColor: destructive,
-              critBorderColor: destructive,
-              todayLineColor: destructive,
+              fontSize: "14px",
               fontFamily: "Manrope, Nunito Sans, Segoe UI, sans-serif",
+              // ── Gantt specific ──
+              sectionBkgColor: "#f5f3ff",
+              sectionBkgColor2: "#faf5ff",
+              sectionTextColor: "#5b21b6",
+              altSectionBkgColor: "#ede9fe",
+              gridColor: "#e2e8f0",
+              taskBkgColor: "#6366f1",
+              taskBorderColor: "#4f46e5",
+              taskTextColor: "#ffffff",
+              taskTextLightColor: "#ffffff",
+              taskTextOutsideColor: "#1e293b",
+              taskTextDarkColor: "#ffffff",
+              activeTaskBkgColor: "#4f46e5",
+              activeTaskBorderColor: "#3730a3",
+              doneTaskBkgColor: "#94a3b8",
+              doneTaskBorderColor: "#64748b",
+              critBkgColor: "#e11d48",
+              critBorderColor: "#be123c",
+              todayLineColor: "#e11d48",
             },
           });
           themedRendered = await tryRenderSources(mermaid);

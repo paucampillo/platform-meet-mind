@@ -191,3 +191,8 @@
     radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.14) 0%, transparent 30%),
     linear-gradient(180deg, #f8fbff 0%, #f4f7ff 50%, #f9fbff 100%);
 }
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
