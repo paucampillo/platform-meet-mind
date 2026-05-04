@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Brain,
@@ -438,6 +438,39 @@ const waitMs = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
+const playNotifSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const master = ctx.createGain();
+    master.gain.value = 0.18;
+    master.connect(ctx.destination);
+
+    const notes = [
+      { freq: 1046.5, start: 0,    dur: 0.18 },
+      { freq: 1318.5, start: 0.12, dur: 0.22 },
+      { freq: 1568.0, start: 0.22, dur: 0.35 },
+    ];
+
+    notes.forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.05);
+    });
+  } catch {
+    // AudioContext not available
+  }
+};
+
 
 export default function MeetingSummary() {
   const [meetingResult, setMeetingResult] = useState<MeetingProcessResult | null>(null);
@@ -452,6 +485,8 @@ export default function MeetingSummary() {
   const [activeSimulationNodeId, setActiveSimulationNodeId] = useState<string | null>(null);
   const [completedSimulationNodeIds, setCompletedSimulationNodeIds] = useState<string[]>([]);
   const [lastStepDurationMs, setLastStepDurationMs] = useState<number | null>(null);
+  const [resultKey, setResultKey] = useState(0);
+  const [visibleNotifications, setVisibleNotifications] = useState<number[]>([]);
 
   const tasks = meetingResult?.tareas || [];
   const groupedTasks = useMemo(() => groupTasksByThemeAndUser(tasks), [tasks]);
@@ -580,7 +615,31 @@ export default function MeetingSummary() {
     setMeetingResult(result);
     setUserColorSeed(Math.floor(Math.random() * 100000));
     setSelectedTaskDetail(null);
+    setResultKey((k) => k + 1);
+    setVisibleNotifications([]);
   };
+
+  useEffect(() => {
+    if (resultKey === 0) return;
+    setVisibleNotifications([]);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    [0, 1, 2, 3].forEach((i) => {
+      const showAt = 400 + i * 520;
+      const hideAt = showAt + 5500;
+
+      timers.push(setTimeout(() => {
+        setVisibleNotifications((prev) => [...prev, i]);
+        if (i === 0) playNotifSound();
+      }, showAt));
+
+      timers.push(setTimeout(() => {
+        setVisibleNotifications((prev) => prev.filter((n) => n !== i));
+      }, hideAt));
+    });
+
+    return () => timers.forEach(clearTimeout);
+  }, [resultKey]);
 
   const relatedBySameOwner = useMemo(() => {
     if (!selectedTaskDetail) return [];
@@ -659,17 +718,29 @@ export default function MeetingSummary() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Resumen abstraido
                 </p>
-                <p className="text-sm leading-relaxed text-foreground/90">
-                  {meetingResult?.resumen ||
-                    "Aun no hay resultado. Pulsa 'Procesar' en la izquierda para generar resumen y vistas detalladas."}
-                </p>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={resultKey}
+                    initial={meetingResult ? { opacity: 0, y: 6 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="text-sm leading-relaxed text-foreground/90"
+                  >
+                    {meetingResult?.resumen ||
+                      "Aun no hay resultado. Pulsa 'Procesar' en la izquierda para generar resumen y vistas detalladas."}
+                  </motion.p>
+                </AnimatePresence>
               </div>
 
-              {/* Action cards – more visual */}
+              {/* Action cards */}
               <div className="grid gap-3 sm:grid-cols-3">
                 {/* Tasks card */}
                 <motion.button
+                  key={`tasks-${resultKey}`}
                   type="button"
+                  initial={meetingResult ? { opacity: 0, y: 24, scale: 0.95 } : false}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.05, type: "spring", stiffness: 260, damping: 20 }}
                   whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
                   whileTap={meetingResult ? { scale: 0.97 } : {}}
                   onClick={() => {
@@ -686,14 +757,27 @@ export default function MeetingSummary() {
                       : "border-border bg-muted/30 cursor-not-allowed opacity-50"
                   }`}
                 >
+                  {meetingResult && (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{ duration: 0.7, delay: 0.2 }}
+                    />
+                  )}
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 shadow-sm">
                       <CheckSquare className="h-4 w-4 text-white" />
                     </div>
                     {tasks.length > 0 && (
-                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 border border-sky-200">
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.3 }}
+                        className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 border border-sky-200"
+                      >
                         {tasks.length}
-                      </span>
+                      </motion.span>
                     )}
                   </div>
                   <p className="font-semibold text-sm text-foreground">Tasks</p>
@@ -705,7 +789,11 @@ export default function MeetingSummary() {
 
                 {/* Diagrama card */}
                 <motion.button
+                  key={`flow-${resultKey}`}
                   type="button"
+                  initial={meetingResult ? { opacity: 0, y: 24, scale: 0.95 } : false}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.15, type: "spring", stiffness: 260, damping: 20 }}
                   whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
                   whileTap={meetingResult ? { scale: 0.97 } : {}}
                   onClick={() => { if (meetingResult) setIsFlowModalOpen(true); }}
@@ -716,6 +804,14 @@ export default function MeetingSummary() {
                       : "border-border bg-muted/30 cursor-not-allowed opacity-50"
                   }`}
                 >
+                  {meetingResult && (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{ duration: 0.7, delay: 0.35 }}
+                    />
+                  )}
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-sm">
                       <Network className="h-4 w-4 text-white" />
@@ -739,7 +835,11 @@ export default function MeetingSummary() {
 
                 {/* Gantt card */}
                 <motion.button
+                  key={`gantt-${resultKey}`}
                   type="button"
+                  initial={meetingResult ? { opacity: 0, y: 24, scale: 0.95 } : false}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.25, type: "spring", stiffness: 260, damping: 20 }}
                   whileHover={meetingResult ? { scale: 1.03, y: -2 } : {}}
                   whileTap={meetingResult ? { scale: 0.97 } : {}}
                   onClick={() => { if (meetingResult) setIsGanttModalOpen(true); }}
@@ -750,14 +850,27 @@ export default function MeetingSummary() {
                       : "border-border bg-muted/30 cursor-not-allowed opacity-50"
                   }`}
                 >
+                  {meetingResult && (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{ duration: 0.7, delay: 0.5 }}
+                    />
+                  )}
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 shadow-sm">
                       <CalendarRange className="h-4 w-4 text-white" />
                     </div>
                     {uniqueUsers > 0 && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.45 }}
+                        className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200"
+                      >
                         {uniqueUsers}p
-                      </span>
+                      </motion.span>
                     )}
                   </div>
                   <p className="font-semibold text-sm text-foreground">Gantt</p>
@@ -769,6 +882,7 @@ export default function MeetingSummary() {
               </div>
             </CardContent>
           </Card>
+
         </section>
       </main>
 
@@ -1276,6 +1390,103 @@ export default function MeetingSummary() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* ── Windows/Chrome-style notification toasts ─────────────────── */}
+      {(() => {
+        const NOTIFS = [
+          {
+            icon: CheckSquare,
+            title: `${tasks.length} tarea${tasks.length !== 1 ? "s" : ""} identificada${tasks.length !== 1 ? "s" : ""}`,
+            body: tasks.map((t) => t.responsable).filter(Boolean).join(" · ") || "Asignadas automaticamente",
+            accent: "#0ea5e9",
+            iconBg: "linear-gradient(135deg,#0ea5e9,#6366f1)",
+          },
+          {
+            icon: Network,
+            title: "Diagrama de flujo generado",
+            body: "Dependencias entre tareas detectadas",
+            accent: "#8b5cf6",
+            iconBg: "linear-gradient(135deg,#8b5cf6,#ec4899)",
+          },
+          {
+            icon: CalendarRange,
+            title: "Cronograma Gantt listo",
+            body: `${uniqueUsers} responsable${uniqueUsers !== 1 ? "s" : ""} planificado${uniqueUsers !== 1 ? "s" : ""}`,
+            accent: "#10b981",
+            iconBg: "linear-gradient(135deg,#10b981,#14b8a6)",
+          },
+          {
+            icon: Sparkles,
+            title: "Resumen ejecutivo disponible",
+            body: "Analisis completo de la reunion",
+            accent: "#f59e0b",
+            iconBg: "linear-gradient(135deg,#f59e0b,#f97316)",
+          },
+        ];
+
+        return (
+          <div className="fixed bottom-5 right-5 z-[9999] flex flex-col-reverse gap-2.5" style={{ width: 360 }}>
+            <AnimatePresence>
+              {visibleNotifications.map((i) => {
+                const n = NOTIFS[i];
+                if (!n) return null;
+                const Icon = n.icon;
+                return (
+                  <motion.div
+                    key={`notif-${resultKey}-${i}`}
+                    initial={{ opacity: 0, x: 380, scale: 0.92 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 380, scale: 0.92 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                    className="relative overflow-hidden rounded-xl border border-black/[0.07] bg-white/95 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-md"
+                  >
+                    {/* Top bar: app identity */}
+                    <div className="flex items-center gap-2 border-b border-black/[0.05] px-3.5 py-2">
+                      <div className="flex h-4 w-4 items-center justify-center rounded-sm bg-primary">
+                        <Brain className="h-2.5 w-2.5 text-white" />
+                      </div>
+                      <span className="text-[11px] font-semibold text-foreground/70 tracking-wide">MeetMind</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">ahora</span>
+                      <button
+                        type="button"
+                        onClick={() => setVisibleNotifications((prev) => prev.filter((n) => n !== i))}
+                        className="ml-1 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/60 hover:bg-black/10 hover:text-foreground transition-colors text-[11px] leading-none"
+                        aria-label="Cerrar"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex items-start gap-3 px-3.5 py-3">
+                      <div
+                        className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-sm"
+                        style={{ background: n.iconBg }}
+                      >
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <p className="text-[13px] font-semibold text-foreground leading-tight">{n.title}</p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground leading-snug">{n.body}</p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar (depletes over 5.5 s) */}
+                    <div className="h-0.5 w-full bg-black/[0.05]">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: n.accent }}
+                        initial={{ width: "100%" }}
+                        animate={{ width: "0%" }}
+                        transition={{ duration: 5.5, ease: "linear" }}
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Brain, Clock, Loader2, Mic, MicOff, Sparkles, StopCircle, Waves, Zap } from "lucide-react";
+import { Brain, Mic, Sparkles, StopCircle, Waves, Zap } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -79,7 +79,6 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [audioMeta, setAudioMeta] = useState<AudioMeta | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
 
@@ -215,12 +214,7 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
 
   const startSpeechRecognition = () => {
     const SpeechRecognitionCtor = getSpeechRecognitionCtor();
-    if (!SpeechRecognitionCtor) {
-      setErrorMessage(
-        "Tu navegador graba audio, pero no soporta transcripcion automatica. Puedes escribir en el campo manual.",
-      );
-      return false;
-    }
+    if (!SpeechRecognitionCtor) return false;
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "";
@@ -241,13 +235,9 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
           interimChunk += `${phrase} `;
         }
       }
-
+      setLiveTranscript(interimChunk.replace(/\s+/g, " ").trim());
       const normalized = finalChunk.replace(/\s+/g, " ").trim();
-      const normalizedInterim = interimChunk.replace(/\s+/g, " ").trim();
-      setLiveTranscript(normalizedInterim);
-
       if (!normalized) return;
-
       setText((prev) => {
         const current = prev.trim();
         return current ? `${current}\n${normalized}` : normalized;
@@ -257,37 +247,20 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
     recognition.onerror = (event: any) => {
       const error = String(event?.error || "");
       if (error === "not-allowed" || error === "service-not-allowed") {
-        setErrorMessage(
-          "No hay permiso para transcribir voz. Activa el microfono en el navegador.",
-        );
         shouldRestartRecognitionRef.current = false;
       } else if (error === "network") {
         if (shouldRestartRecognitionRef.current && speechRetryCountRef.current < 2) {
           speechRetryCountRef.current += 1;
-          setErrorMessage(
-            `La transcripcion perdio conexion. Reintentando (${speechRetryCountRef.current}/2)...`,
-          );
           return;
         }
-        setErrorMessage(
-          "Error de transcripcion por red del navegador. Prueba en Chrome/Edge, localhost y con internet estable.",
-        );
         shouldRestartRecognitionRef.current = false;
         setIsTranscribing(false);
-      } else if (error === "no-speech") {
-        // Normal when user pauses; keep silent.
-      } else if (error) {
-        setErrorMessage(`Error de transcripcion: ${error}`);
       }
     };
 
     recognition.onend = () => {
       if (!shouldRestartRecognitionRef.current) return;
-      try {
-        recognition.start();
-      } catch {
-        setIsTranscribing(false);
-      }
+      try { recognition.start(); } catch { setIsTranscribing(false); }
     };
 
     recognitionRef.current = recognition;
@@ -296,7 +269,6 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
       recognition.start();
       setIsTranscribing(true);
       speechRetryCountRef.current = 0;
-      setErrorMessage(null);
       return true;
     } catch {
       shouldRestartRecognitionRef.current = false;
@@ -340,38 +312,29 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
 
   const processMeeting = async (nextAudioMeta?: AudioMeta | null) => {
     if (isLoading) return;
-    if (!text.trim()) {
-      setErrorMessage("Anade texto de la reunion para procesar con IA en esta version.");
-      return;
-    }
 
     setIsLoading(true);
-    setErrorMessage(null);
 
     try {
       const response = await postApiJson<ProcessMeetingApiResponse>(
         "/api/process-meeting",
         {
-          text: text.trim(),
+          text: text.trim() || "demo",
           audioMeta: nextAudioMeta ?? audioMeta,
         },
       );
 
-      if (!response.success || !response.data) {
-        setErrorMessage(response.error || "No se pudo procesar la reunion.");
-        return;
+      if (response.success && response.data) {
+        onProcessed(response.data);
       }
-
-      onProcessed(response.data);
-    } catch (error: any) {
-      setErrorMessage(error?.message || "Error al procesar la reunion.");
+    } catch {
+      // silently ignored in demo mode
     } finally {
       setIsLoading(false);
     }
   };
 
   const startRecording = async () => {
-    setErrorMessage(null);
     recordingStartRef.current = Date.now();
 
     const speechStarted = startSpeechRecognition();
@@ -391,7 +354,6 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      setErrorMessage("Tu navegador no soporta grabacion de audio.");
       return;
     }
 
@@ -416,11 +378,7 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
           ? Date.now() - recordingStartRef.current
           : null;
 
-        const resolvedAudioMeta = {
-          mimeType,
-          size: blob.size,
-          durationMs,
-        };
+        const resolvedAudioMeta = { mimeType, size: blob.size, durationMs };
         setAudioMeta(resolvedAudioMeta);
         stopAudioAnalysis();
         cleanupStream();
@@ -432,8 +390,7 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
 
       recorder.start();
       setIsRecording(true);
-    } catch (error: any) {
-      setErrorMessage(error?.message || "No se pudo iniciar la grabacion de audio.");
+    } catch {
       cleanupStream();
       setIsRecording(false);
       void finalizeSpeechRecognition(0);
@@ -561,12 +518,6 @@ export function MeetingInput({ initialText = "", onProcessed }: MeetingInputProp
             </p>
           )}
         </div>
-
-        {errorMessage && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {errorMessage}
-          </p>
-        )}
 
         {/* ── Processing animation / Procesar button ────────────────── */}
         <AnimatePresence mode="wait">
