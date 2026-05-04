@@ -15,50 +15,48 @@ const MODEL_CANDIDATES = [
 // ── Fallback fijo para la demo ────────────────────────────────────────────────
 const DEMO_FALLBACK = {
   resumen:
-    "Reunion de lanzamiento de la nueva web programada para esta semana. Daniele se encarga de terminar el diseno final antes del miercoles, Humbert programara la pagina en cuanto reciba los archivos, Pau aprobara el presupuesto el lunes y Albert coordinara la revision y validacion final antes del lanzamiento.",
+    "Albert convoca reunion urgente para lanzar la nueva web esta semana. Daniele debe terminar el diseno final el miercoles. Humbert programara la pagina en cuanto reciba los archivos de Daniele. Pau aprobara el presupuesto manana para desbloquear el proyecto. Albert coordina y supervisa el lanzamiento final.",
   tareas: [
     {
       descripcion: "Terminar el diseno final de la web para el miercoles",
       responsable: "Daniele",
     },
     {
-      descripcion: "Programar y documentar la pagina web al recibir los archivos de diseno",
+      descripcion: "Programar la pagina web al recibir los archivos de diseno de Daniele",
       responsable: "Humbert",
     },
     {
-      descripcion: "Implementar la revision y validacion final antes del lanzamiento",
+      descripcion: "Coordinar y supervisar el lanzamiento de la nueva web esta semana",
       responsable: "Albert",
     },
     {
-      descripcion: "Aprobar el presupuesto del proyecto para cerrar el lanzamiento",
+      descripcion: "Aprobar el presupuesto del proyecto manana para cerrar el lanzamiento",
       responsable: "Pau",
     },
   ],
   mermaid_codigo: `flowchart LR
-N0["Inicio - Lanzamiento web"]
-N1["Diseno final para el miercoles (Daniele)"]
-N2["Programar pagina web (Humbert)"]
-N3["Revision y validacion final (Albert)"]
-N4["Aprobar presupuesto (Pau)"]
-N5["Lanzamiento final"]
+N0["Inicio - Lanzamiento web (Albert)"]
+N1["Aprobar presupuesto (Pau)"]
+N2["Diseno final para el miercoles (Daniele)"]
+N3["Programar pagina web (Humbert)"]
+N4["Coordinacion y lanzamiento (Albert)"]
 N0 --> N1
-N0 --> N4
-N1 --> N2
+N0 --> N2
+N1 --> N4
 N2 --> N3
-N3 --> N5
-N4 --> N5`,
+N3 --> N4`,
   gantt_codigo: `gantt
 title Plan de lanzamiento web
 dateFormat YYYY-MM-DD
 axisFormat %d/%m
-section Diseno
-Terminar diseno final :active, t1, 2026-05-04, 2d
-section Desarrollo
-Programar la pagina web :t2, after t1, 2d
-section Validacion
-Revisar y validar web :t3, after t2, 1d
 section Gestion
-Aprobar presupuesto :t4, 2026-05-05, 1d`,
+Aprobar presupuesto (Pau) :t1, 2026-05-05, 1d
+section Diseno
+Terminar diseno final (Daniele) :active, t2, 2026-05-04, 2d
+section Desarrollo
+Programar pagina web (Humbert) :t3, after t2, 2d
+section Coordinacion
+Lanzamiento final (Albert) :t4, after t3, 1d`,
 };
 
 const readContentText = (payload) => {
