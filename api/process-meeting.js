@@ -15,7 +15,7 @@ const MODEL_CANDIDATES = [
 // ── Fallback fijo para la demo ────────────────────────────────────────────────
 const DEMO_FALLBACK = {
   resumen:
-    "Albert convoca reunion urgente para lanzar la nueva web esta semana. Daniele debe terminar el diseno final el miercoles. Humbert programara la pagina en cuanto reciba los archivos de Daniele. Pau aprobara el presupuesto manana para desbloquear el proyecto. Albert coordina y supervisa el lanzamiento final.",
+    "Daniele urge a Albert a lanzar la nueva web esta misma semana. Humbert asigna a Daniele terminar el diseno final para el miercoles. Albert encarga a Humbert programar la pagina en cuanto Daniele le envie los archivos. Pau se compromete a aprobar el presupuesto manana para desbloquear el cierre del proyecto.",
   tareas: [
     {
       descripcion: "Terminar el diseno final de la web para el miercoles",
@@ -26,7 +26,7 @@ const DEMO_FALLBACK = {
       responsable: "Humbert",
     },
     {
-      descripcion: "Coordinar y supervisar el lanzamiento de la nueva web esta semana",
+      descripcion: "Liderar y coordinar el lanzamiento de la nueva web esta semana",
       responsable: "Albert",
     },
     {
