@@ -240,7 +240,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen app-background">
+    <div className="relative z-[1] min-h-screen app-background">
       <Header />
       
       <main className="mx-auto max-w-7xl px-8 py-12">

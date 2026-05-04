@@ -1193,7 +1193,7 @@ Ana Martínez [00:21:00]: Excelente. Reunión de seguimiento el 10 de marzo. Tod
   };
 
   return (
-    <div className="min-h-screen app-background">
+    <div className="relative z-[1] min-h-screen app-background">
       <Header />
 
       <main className="mx-auto max-w-[1600px] px-8 py-8">

@@ -260,7 +260,7 @@ export default function Notifications() {
   };
 
   return (
-    <div className="min-h-screen app-background">
+    <div className="relative z-[1] min-h-screen app-background">
       <Header />
 
       <main className="max-w-[1600px] mx-auto px-8 py-8">

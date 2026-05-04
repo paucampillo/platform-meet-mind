@@ -1,6 +1,12 @@
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
+import { AnimatedBackground } from './components/AnimatedBackground';
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <AnimatedBackground />
+      <RouterProvider router={router} />
+    </>
+  );
 }
